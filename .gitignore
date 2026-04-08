@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+google_credentials.json
+google_token.pickle
+/tmp/
+*.zip
+.DS_Store

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Curator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #1a1612;
+      --paper: #f5f0e8;
+      --cream: #ede8de;
+      --amber: #c8883a;
+      --amber-light: #e8b56a;
+      --amber-pale: #fdf4e3;
+      --red: #c94040;
+      --green: #3a7a5a;
+      --muted: #8a7f72;
+      --border: #d4cdc0;
+      --shadow: rgba(26,22,18,0.12);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 48px 24px 80px;
+    }
+
+    /* ── header ── */
+    header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .wordmark {
+      font-family: 'Playfair Display', serif;
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .wordmark em {
+      font-style: italic;
+      color: var(--amber);
+    }
+
+    .tagline {
+      margin-top: 10px;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── card ── */
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 2px 24px var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-body {
+      padding: 40px;
+    }
+
+    /* ── section labels ── */
+    .label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── album name input ── */
+    .field {
+      margin-bottom: 28px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--paper);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--amber);
+    }
+
+    /* ── drop zone ── */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 3px;
+      padding: 48px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--amber-pale);
+      position: relative;
+    }
+
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--amber);
+      background: #fef8ed;
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 36px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .drop-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .drop-sub {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      margin-top: 12px;
+    }
+
+    .file-selected.show { display: flex; }
+
+    .file-icon { font-size: 20px; }
+
+    .file-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .file-size {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      white-space: nowrap;
+    }
+
+    /* ── submit button ── */
+    .btn-submit {
+      width: 100%;
+      margin-top: 28px;
+      padding: 16px;
+      background: var(--amber);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn-submit:hover:not(:disabled) { background: #b8782a; }
+    .btn-submit:active:not(:disabled) { transform: scale(0.99); }
+    .btn-submit:disabled { background: var(--muted); cursor: not-allowed; }
+
+    /* ── divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0;
+    }
+
+    /* ── progress panel ── */
+    #progress-panel {
+      display: none;
+      padding: 32px 40px 40px;
+    }
+
+    #progress-panel.show { display: block; }
+
+    .stage-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--ink);
+      margin-bottom: 14px;
+      min-height: 18px;
+    }
+
+    .progress-track {
+      height: 4px;
+      background: var(--cream);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--amber);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 24px;
+    }
+
+    .stat {
+      flex: 1;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 14px 16px;
+    }
+
+    .stat-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      color: var(--ink);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── result states ── */
+    .result {
+      display: none;
+      padding: 28px 40px 40px;
+      text-align: center;
+    }
+
+    .result.show { display: block; }
+
+    .result-icon { font-size: 40px; margin-bottom: 14px; }
+
+    .result-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+
+    .result-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .btn-album {
+      display: inline-block;
+      padding: 13px 28px;
+      background: var(--amber);
+      color: white;
+      text-decoration: none;
+      border-radius: 3px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      transition: background 0.2s;
+      margin-bottom: 16px;
+    }
+
+    .btn-album:hover { background: #b8782a; }
+
+    .btn-reset {
+      display: block;
+      margin: 12px auto 0;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'DM Mono', monospace;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 3px;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--red);
+      font-family: 'DM Mono', monospace;
+      word-break: break-word;
+    }
+
+    /* ── footer note ── */
+    .footer-note {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      line-height: 1.8;
+    }
+
+    /* ── decorative rule ── */
+    .ornament {
+      text-align: center;
+      color: var(--amber);
+      font-size: 18px;
+      letter-spacing: 8px;
+      margin: 8px 0 40px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wordmark">Photo <em>Curator</em></div>
+    <div class="ornament">✦ ✦ ✦</div>
+    <div class="tagline">Trip photos → curated album, automatically</div>
+  </header>
+
+  <div class="card">
+
+    <!-- Upload form -->
+    <div class="card-body" id="upload-panel">
+
+      <div class="field">
+        <div class="label">Album name</div>
+        <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026" />
+      </div>
+
+      <div class="label">Google Takeout ZIP</div>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".zip" />
+        <span class="drop-icon">📦</span>
+        <div class="drop-title">Drop your Takeout ZIP here</div>
+        <div class="drop-sub">or click to browse · .zip files only</div>
+      </div>
+
+      <div class="file-selected" id="file-selected">
+        <span class="file-icon">🗜</span>
+        <span class="file-name" id="file-name-label">—</span>
+        <span class="file-size" id="file-size-label">—</span>
+      </div>
+
+      <button class="btn-submit" id="submit-btn" disabled onclick="startUpload()">
+        Curate Photos
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Progress -->
+    <div id="progress-panel">
+      <div class="label">Pipeline progress</div>
+      <div class="stage-label" id="stage-label">Initializing...</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-label">Photos found</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-kept">—</div>
+          <div class="stat-label">Keepers selected</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div class="result" id="result-success">
+      <div class="result-icon">🎞</div>
+      <div class="result-title">Album ready</div>
+      <div class="result-sub" id="result-summary">Your best photos have been curated.</div>
+      <a href="#" id="album-link" class="btn-album" target="_blank">Open in Google Photos →</a>
+      <button class="btn-reset" onclick="reset()">Curate another trip</button>
+    </div>
+
+    <!-- No Google token -->
+    <div class="result" id="result-no-token">
+      <div class="result-icon">✅</div>
+      <div class="result-title">Curation complete</div>
+      <div class="result-sub" id="result-no-token-summary">Photos scored and selected.</div>
+      <div class="error-msg" style="text-align:left; margin-bottom:16px;">
+        No Google Photos token configured — set <code>GOOGLE_PHOTOS_TOKEN</code> in Railway env vars to enable album creation.
+      </div>
+      <button class="btn-reset" onclick="reset()">Curate another trip</button>
+    </div>
+
+    <!-- Error -->
+    <div class="result" id="result-error">
+      <div class="result-icon">⚠️</div>
+      <div class="result-title">Something went wrong</div>
+      <div class="error-msg" id="error-msg">—</div>
+      <button class="btn-reset" style="margin-top:20px;" onclick="reset()">Try again</button>
+    </div>
+
+  </div>
+
+  <div class="footer-note">
+    Pipeline: dedup → blur/exposure filter → AI scoring → album creation<br>
+    Typical cost: $1–3 per trip · Typical time: 5–15 min for 1,000 photos
+  </div>
+
+<script>
+  const API = window.location.origin; // same origin when served from Railway
+
+  let selectedFile = null;
+  let pollInterval = null;
+
+  // ── drag & drop ──
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.zip')) setFile(f);
+  });
+
+  document.getElementById('file-input').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) setFile(f);
+  });
+
+  function setFile(f) {
+    selectedFile = f;
+    document.getElementById('file-name-label').textContent = f.name;
+    document.getElementById('file-size-label').textContent = formatBytes(f.size);
+    document.getElementById('file-selected').classList.add('show');
+    document.getElementById('submit-btn').disabled = false;
+  }
+
+  function formatBytes(b) {
+    if (b > 1e9) return (b / 1e9).toFixed(1) + ' GB';
+    if (b > 1e6) return (b / 1e6).toFixed(1) + ' MB';
+    return (b / 1e3).toFixed(0) + ' KB';
+  }
+
+  // ── upload & poll ──
+  async function startUpload() {
+    if (!selectedFile) return;
+
+    const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
+
+    // Show progress panel
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('progress-panel').classList.add('show');
+    document.getElementById('stage-label').textContent = 'Uploading ZIP...';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('album_name', albumName);
+
+    try {
+      const r = await fetch(`${API}/api/upload`, { method: 'POST', body: fd });
+      const { job_id } = await r.json();
+      pollJob(job_id);
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  function pollJob(jobId) {
+    pollInterval = setInterval(async () => {
+      try {
+        const r = await fetch(`${API}/api/status/${jobId}`);
+        const job = await r.json();
+
+        // Update UI
+        document.getElementById('stage-label').textContent = job.stage || '...';
+        document.getElementById('progress-fill').style.width = (job.progress || 0) + '%';
+        if (job.total) document.getElementById('stat-total').textContent = job.total.toLocaleString();
+        if (job.kept) document.getElementById('stat-kept').textContent = job.kept.toLocaleString();
+
+        if (job.status === 'done') {
+          clearInterval(pollInterval);
+          showDone(job);
+        } else if (job.status === 'error') {
+          clearInterval(pollInterval);
+          showError(job.error || 'Unknown error');
+        }
+      } catch (err) {
+        // network hiccup, keep polling
+      }
+    }, 2000);
+  }
+
+  function showDone(job) {
+    document.getElementById('progress-panel').classList.remove('show');
+    const total = job.total || '?';
+    const kept = job.kept || '?';
+    const pct = job.total ? Math.round((job.kept / job.total) * 100) : '?';
+    const summary = `${kept} keepers selected from ${total} photos (${pct}%). All duplicates removed.`;
+
+    if (job.album_url && job.album_url !== 'no_google_token') {
+      document.getElementById('result-summary').textContent = summary;
+      document.getElementById('album-link').href = job.album_url;
+      document.getElementById('result-success').classList.add('show');
+    } else {
+      document.getElementById('result-no-token-summary').textContent = summary;
+      document.getElementById('result-no-token').classList.add('show');
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('progress-panel').classList.remove('show');
+    document.getElementById('error-msg').textContent = msg;
+    document.getElementById('result-error').classList.add('show');
+  }
+
+  function reset() {
+    selectedFile = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-selected').classList.remove('show');
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('stat-total').textContent = '—';
+    document.getElementById('stat-kept').textContent = '—';
+    document.getElementById('progress-panel').classList.remove('show');
+    document.getElementById('result-success').classList.remove('show');
+    document.getElementById('result-no-token').classList.remove('show');
+    document.getElementById('result-error').classList.remove('show');
+    clearInterval(pollInterval);
+  }
+</script>
+</body>
+</html>
