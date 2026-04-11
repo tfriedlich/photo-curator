@@ -1,4 +1,3 @@
-import os
 import uuid
 import urllib.parse
 import httpx
@@ -10,8 +9,10 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import config
 from pipeline import run_pipeline
 from state import job_store
+from events import get_events
 
 app = FastAPI(title="Photo Curator")
 
@@ -22,10 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-APP_BASE_URL         = os.environ.get("APP_BASE_URL", "https://photos.toddfriedlich.com")
-REDIRECT_URI         = f"{APP_BASE_URL}/auth/callback"
+REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
 
 GOOGLE_SCOPES = " ".join([
     "https://www.googleapis.com/auth/photoslibrary.readonly",
@@ -33,22 +31,17 @@ GOOGLE_SCOPES = " ".join([
     "https://www.googleapis.com/auth/photoslibrary.appendonly",
 ])
 
-token_store: dict = {
-    "access_token": os.environ.get("GOOGLE_PHOTOS_TOKEN", ""),
-    "refresh_token": "",
-}
-
-# Track album IDs created by this app
+token_store: dict = {"access_token": "", "refresh_token": ""}
 created_album_ids: set = set()
 
 
 # ── OAuth ──────────────────────────────────────────────────────────────────────
 @app.get("/auth/login")
 async def auth_login():
-    if not GOOGLE_CLIENT_ID:
+    if not config.GOOGLE_CLIENT_ID:
         raise HTTPException(500, "GOOGLE_CLIENT_ID not configured")
     params = {
-        "client_id": GOOGLE_CLIENT_ID,
+        "client_id": config.GOOGLE_CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
         "response_type": "code",
         "scope": GOOGLE_SCOPES,
@@ -70,8 +63,8 @@ async def auth_callback(code: str = None, error: str = None):
             "https://oauth2.googleapis.com/token",
             data={
                 "code": code,
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
+                "client_id": config.GOOGLE_CLIENT_ID,
+                "client_secret": config.GOOGLE_CLIENT_SECRET,
                 "redirect_uri": REDIRECT_URI,
                 "grant_type": "authorization_code",
             },
@@ -96,18 +89,28 @@ async def auth_disconnect():
     return {"ok": True}
 
 
-# ── Albums endpoint ────────────────────────────────────────────────────────────
+# ── Events (trip/notable day suggestions) ─────────────────────────────────────
+@app.get("/api/events")
+async def get_event_suggestions(days: int = None):
+    access_token = token_store.get("access_token", "")
+    if not access_token:
+        raise HTTPException(401, "Not connected")
+    if days is None:
+        days = config.LOOKBACK_DAYS
+    days = min(days, config.MAX_LOOKBACK_DAYS)
+    events = await get_events(access_token, days)
+    return {"events": events, "days_searched": days}
+
+
+# ── Albums ─────────────────────────────────────────────────────────────────────
 @app.get("/api/albums")
 async def get_albums():
-    """Return 10 most recent albums, flagging ones created by this app."""
     access_token = token_store.get("access_token", "")
     if not access_token:
         raise HTTPException(401, "Not connected")
 
     headers = {"Authorization": f"Bearer {access_token}"}
-
     async with httpx.AsyncClient(timeout=30) as client:
-        # Fetch albums list
         r = await client.get(
             "https://photoslibrary.googleapis.com/v1/albums",
             headers=headers,
@@ -126,7 +129,6 @@ async def get_albums():
             if cover_url:
                 cover_url += "=w400-h300-c"
 
-            # Fetch a few media items to get date range + location
             date_range = None
             location = None
             try:
@@ -135,37 +137,25 @@ async def get_albums():
                     headers=headers,
                     json={"albumId": album_id, "pageSize": 10},
                 )
-                media_data = mr.json()
-                items = media_data.get("mediaItems", [])
-
+                items = mr.json().get("mediaItems", [])
                 if items:
-                    # Date range from metadata
-                    times = []
-                    for item in items:
-                        ct = item.get("mediaMetadata", {}).get("creationTime", "")
-                        if ct:
-                            times.append(ct[:10])  # YYYY-MM-DD
+                    times = sorted(
+                        t for t in (i.get("mediaMetadata", {}).get("creationTime", "")[:10] for i in items) if t
+                    )
                     if times:
-                        times.sort()
-                        if times[0] == times[-1]:
-                            date_range = times[0]
-                        else:
-                            date_range = f"{times[0]} – {times[-1]}"
+                        date_range = times[0] if times[0] == times[-1] else f"{times[0]} – {times[-1]}"
 
-                    # Location from first item that has GPS
                     for item in items:
                         meta = item.get("mediaMetadata", {})
-                        lat = meta.get("photo", {}).get("latitude") or meta.get("latitude")
-                        lng = meta.get("photo", {}).get("longitude") or meta.get("longitude")
+                        lat = meta.get("photo", {}).get("latitude")
+                        lng = meta.get("photo", {}).get("longitude")
                         if lat and lng:
-                            # Reverse geocode
                             geo = await client.get(
-                                f"https://nominatim.openstreetmap.org/reverse",
+                                "https://nominatim.openstreetmap.org/reverse",
                                 params={"lat": lat, "lon": lng, "format": "json"},
                                 headers={"User-Agent": "PhotoCurator/1.0"},
                             )
-                            geo_data = geo.json()
-                            addr = geo_data.get("address", {})
+                            addr = geo.json().get("address", {})
                             parts = [
                                 addr.get("city") or addr.get("town") or addr.get("village"),
                                 addr.get("country"),
@@ -189,7 +179,7 @@ async def get_albums():
     return {"albums": albums}
 
 
-# ── Curate endpoint ────────────────────────────────────────────────────────────
+# ── Curate ─────────────────────────────────────────────────────────────────────
 class CurateRequest(BaseModel):
     start_date: date
     end_date: date
@@ -206,27 +196,15 @@ async def start_curate(req: CurateRequest, background_tasks: BackgroundTasks):
 
     job_id = str(uuid.uuid4())
     job_store[job_id] = {
-        "status": "queued",
-        "stage": "Starting",
-        "progress": 0,
-        "total": 0,
-        "kept": 0,
-        "album_url": None,
-        "album_id": None,
-        "error": None,
+        "status": "queued", "stage": "Starting", "progress": 0,
+        "total": 0, "kept": 0, "album_url": None, "error": None,
         "album_name": req.album_name,
     }
 
     background_tasks.add_task(
-        run_pipeline,
-        job_id,
-        req.start_date,
-        req.end_date,
-        req.album_name,
-        access_token,
-        created_album_ids,
+        run_pipeline, job_id, req.start_date, req.end_date,
+        req.album_name, access_token, created_album_ids,
     )
-
     return {"job_id": job_id}
 
 

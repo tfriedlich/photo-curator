@@ -8,15 +8,18 @@ from typing import Optional
 import httpx
 
 from state import job_store
+import config
 
 # ── constants ──────────────────────────────────────────────────────────────────
 WORK_DIR = Path("/tmp/photo-curator/jobs")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"}
-TARGET_KEEP_RATIO = 0.20
-DUPLICATE_HASH_THRESHOLD = 10
-BURST_WINDOW_SECONDS = 3
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GOOGLE_PHOTOS_PAGE_SIZE = 100  # max allowed by API
+
+# Pull from config (env-driven)
+TARGET_KEEP_RATIO        = config.TARGET_KEEP_RATIO
+DUPLICATE_HASH_THRESHOLD = config.DUPLICATE_HASH_THRESHOLD
+BURST_WINDOW_SECONDS     = config.BURST_WINDOW_SECONDS
+ANTHROPIC_API_KEY        = config.ANTHROPIC_API_KEY
 
 
 def update_job(job_id: str, **kwargs):
@@ -383,7 +386,7 @@ async def run_pipeline(
                 pct = 36 + int((i / len(image_paths)) * 14)
                 update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{len(image_paths)})")
 
-        images = [img for img in images if img["blur"] > 20 and img["exposure"] > 0.15]
+        images = [img for img in images if img["blur"] > config.MIN_BLUR_SCORE and img["exposure"] > config.MIN_EXPOSURE_SCORE]
 
         # 4. Cluster duplicates
         update_job(job_id, stage="Clustering duplicates", progress=52)

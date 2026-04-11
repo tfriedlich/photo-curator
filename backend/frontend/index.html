@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Photo Curator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,8 +11,7 @@
     :root {
       --ink: #1a1612; --paper: #f5f0e8; --cream: #ede8de; --amber: #c8883a;
       --amber-pale: #fdf4e3; --red: #c94040; --muted: #8a7f72;
-      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12);
-      --app-badge: #c8883a;
+      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12); --green: #3a7a5a;
     }
     html, body { min-height: 100%; background: var(--paper); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 300; }
     body { display: flex; flex-direction: column; align-items: center; padding: 48px 24px 80px; }
@@ -23,53 +22,75 @@
     .tagline { margin-top: 10px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
     .ornament { color: var(--amber); font-size: 18px; letter-spacing: 8px; margin: 8px 0 32px; }
 
-    /* ── Two column layout ── */
-    .layout {
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      gap: 24px;
-      width: 100%;
-      max-width: 1000px;
-      align-items: start;
-    }
+    .layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; width: 100%; max-width: 960px; align-items: start; }
+    @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } .albums-panel { order: -1; } }
 
-    @media (max-width: 800px) {
-      .layout { grid-template-columns: 1fr; }
-      .albums-panel { order: -1; }
-    }
-
-    /* ── Shared card style ── */
     .card { background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 2px 24px var(--shadow); overflow: hidden; }
     .card-body { padding: 32px; }
-    .label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .section-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
     .divider { height: 1px; background: var(--border); }
-    .field { margin-bottom: 24px; }
 
-    /* ── Google banner ── */
-    .google-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 3px; margin-bottom: 24px; border: 1px solid var(--border); background: var(--paper); }
-    .google-banner.connected { border-color: #86efac; background: #f0fdf4; }
-    .google-banner.disconnected { border-color: #fca5a5; background: #fef2f2; }
-    .google-icon { font-size: 20px; flex-shrink: 0; }
-    .google-text { flex: 1; min-width: 0; }
-    .google-text strong { display: block; font-size: 12px; font-weight: 500; color: var(--ink); }
-    .google-text span { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
-    .btn-connect { padding: 8px 14px; border-radius: 3px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; white-space: nowrap; transition: background 0.2s; flex-shrink: 0; }
-    .btn-connect.connect { background: var(--amber); color: white; }
-    .btn-connect.connect:hover { background: #b8782a; }
-    .btn-connect.disconnect { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
+    /* Connect wall */
+    #connect-wall { padding: 48px 32px; text-align: center; }
+    #connect-wall .wall-icon { font-size: 44px; margin-bottom: 16px; }
+    #connect-wall h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 8px; }
+    #connect-wall p { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+    .btn-big-connect { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; text-decoration: none; }
+    .btn-big-connect:hover { background: #b8782a; }
 
-    /* ── Inputs ── */
+    /* Connected header strip */
+    #connected-strip { display: none; align-items: center; gap: 12px; padding: 14px 20px; background: #f0fdf4; border-bottom: 1px solid #86efac; }
+    #connected-strip.show { display: flex; }
+    #connected-strip span { flex: 1; font-size: 12px; color: var(--green); font-family: 'DM Mono', monospace; }
+    .btn-disconnect { background: none; border: 1px solid var(--border); border-radius: 3px; padding: 6px 12px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .btn-disconnect:hover { background: var(--cream); }
+
+    /* Event suggestions */
+    #suggestions-section { display: none; padding: 24px 32px 0; }
+    #suggestions-section.show { display: block; }
+    .suggestions-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+
+    .event-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border: 1px solid var(--border); border-radius: 3px;
+      background: var(--paper); cursor: pointer; transition: all 0.15s;
+      text-align: left; width: 100%;
+    }
+    .event-card:hover { border-color: var(--amber); background: var(--amber-pale); }
+    .event-card.selected { border-color: var(--amber); background: var(--amber-pale); box-shadow: 0 0 0 2px rgba(200,136,58,0.2); }
+    .event-icon { font-size: 20px; flex-shrink: 0; }
+    .event-info { flex: 1; min-width: 0; }
+    .event-name { font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+    .event-count { font-size: 11px; color: var(--amber); font-family: 'DM Mono', monospace; white-space: nowrap; flex-shrink: 0; }
+
+    .suggestions-loading { padding: 16px 0; text-align: center; font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    .expand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .expand-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
+    .month-picker { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--ink); outline: none; }
+    .month-picker:focus { border-color: var(--amber); }
+    .btn-expand { padding: 8px 14px; background: var(--cream); border: 1px solid var(--border); border-radius: 3px; font-size: 11px; color: var(--ink); cursor: pointer; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+    .btn-expand:hover { background: var(--border); }
+
+    /* Form section */
+    #form-section { display: none; padding: 20px 32px 32px; }
+    #form-section.show { display: block; }
+    .form-divider { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .form-divider-line { flex: 1; height: 1px; background: var(--border); }
+    .form-divider-label { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+
+    .field { margin-bottom: 18px; }
     input[type="text"], input[type="date"] { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); outline: none; transition: border-color 0.2s; }
     input[type="text"]:focus, input[type="date"]:focus { border-color: var(--amber); }
-    .date-row { display: flex; gap: 12px; margin-bottom: 24px; }
+    .date-row { display: flex; gap: 12px; margin-bottom: 18px; }
     .date-row .field { flex: 1; margin-bottom: 0; }
 
-    /* ── Submit ── */
-    .btn-submit { width: 100%; padding: 14px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 0.04em; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+    .btn-submit { width: 100%; padding: 14px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 0.04em; cursor: pointer; transition: background 0.2s; margin-top: 4px; }
     .btn-submit:hover:not(:disabled) { background: #b8782a; }
     .btn-submit:disabled { background: var(--muted); cursor: not-allowed; }
 
-    /* ── Progress ── */
+    /* Progress */
     #progress-panel { display: none; padding: 24px 32px 32px; }
     #progress-panel.show { display: block; }
     .stage-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink); margin-bottom: 12px; min-height: 16px; }
@@ -80,85 +101,41 @@
     .stat-value { font-family: 'Playfair Display', serif; font-size: 26px; color: var(--ink); line-height: 1; margin-bottom: 3px; }
     .stat-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
 
-    /* ── Results ── */
+    /* Results */
     .result { display: none; padding: 24px 32px 32px; text-align: center; }
     .result.show { display: block; }
     .result-icon { font-size: 36px; margin-bottom: 12px; }
     .result-title { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 8px; }
     .result-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
-    .btn-album { display: inline-block; padding: 12px 24px; background: var(--amber); color: white; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 500; letter-spacing: 0.05em; transition: background 0.2s; margin-bottom: 12px; }
+    .btn-album { display: inline-block; padding: 12px 24px; background: var(--amber); color: white; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 500; transition: background 0.2s; margin-bottom: 12px; }
     .btn-album:hover { background: #b8782a; }
     .btn-reset { display: block; margin: 8px auto 0; background: none; border: none; color: var(--muted); font-size: 11px; font-family: 'DM Mono', monospace; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
     .error-msg { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 3px; padding: 12px 14px; font-size: 12px; color: var(--red); font-family: 'DM Mono', monospace; word-break: break-word; text-align: left; }
 
-    /* ── Albums panel ── */
-    .albums-panel { display: flex; flex-direction: column; gap: 0; }
-    .albums-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .albums-header h2 { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 400; }
-    .albums-loading { padding: 32px; text-align: center; color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; }
-    .albums-empty { padding: 32px; text-align: center; color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; line-height: 1.8; }
+    /* Albums panel */
+    .albums-panel { display: flex; flex-direction: column; }
+    .albums-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .albums-header h2 { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 400; }
+    .btn-refresh { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; padding: 2px 6px; border-radius: 3px; }
+    .btn-refresh:hover { background: var(--cream); }
+    .albums-placeholder { padding: 32px 20px; text-align: center; color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; line-height: 1.8; }
     .albums-list { display: flex; flex-direction: column; }
-
-    /* ── Album card ── */
-    .album-card {
-      display: flex;
-      gap: 0;
-      border-bottom: 1px solid var(--border);
-      text-decoration: none;
-      color: inherit;
-      transition: background 0.15s;
-      position: relative;
-      overflow: hidden;
-    }
+    .album-card { display: flex; gap: 0; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s; position: relative; overflow: hidden; }
     .album-card:last-child { border-bottom: none; }
     .album-card:hover { background: var(--amber-pale); }
+    .album-thumb { width: 76px; height: 76px; flex-shrink: 0; object-fit: cover; background: var(--cream); }
+    .album-thumb-placeholder { width: 76px; height: 76px; flex-shrink: 0; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .album-info { padding: 10px 12px; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+    .album-title { font-size: 12px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .album-meta { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .app-badge { position: absolute; top: 6px; right: 6px; background: var(--amber); color: white; font-size: 8px; font-family: 'DM Mono', monospace; padding: 2px 5px; border-radius: 2px; text-transform: uppercase; }
 
-    .album-thumb {
-      width: 80px;
-      height: 80px;
-      flex-shrink: 0;
-      object-fit: cover;
-      background: var(--cream);
-    }
-    .album-thumb-placeholder {
-      width: 80px;
-      height: 80px;
-      flex-shrink: 0;
-      background: var(--cream);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-    }
-
-    .album-info { padding: 12px 14px; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
-    .album-title { font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .album-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    /* App badge */
-    .app-badge {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: var(--amber);
-      color: white;
-      font-size: 9px;
-      font-family: 'DM Mono', monospace;
-      letter-spacing: 0.05em;
-      padding: 2px 6px;
-      border-radius: 2px;
-      text-transform: uppercase;
-    }
-
-    /* ── Toast ── */
-    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 12px 24px; border-radius: 3px; font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 12px 24px; border-radius: 3px; font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 100; }
     .toast.show { opacity: 1; }
-
     .footer-note { margin-top: 28px; text-align: center; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; line-height: 1.8; }
   </style>
 </head>
 <body>
-
   <header>
     <div class="wordmark">Photo <em>Curator</em></div>
     <div class="ornament">✦ ✦ ✦</div>
@@ -167,67 +144,94 @@
 
   <div class="layout">
 
-    <!-- ── Left: Albums panel ── -->
+    <!-- Albums panel -->
     <div class="albums-panel card" id="albums-panel">
       <div class="albums-header">
         <h2>Recent Albums</h2>
-        <button onclick="loadAlbums()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;" title="Refresh">↻</button>
+        <button class="btn-refresh" onclick="loadAlbums()" title="Refresh">↻</button>
       </div>
-      <div class="albums-loading" id="albums-loading">Connect Google Photos<br>to see your albums</div>
+      <div class="albums-placeholder" id="albums-placeholder">Connect Google Photos<br>to see your albums</div>
       <div class="albums-list" id="albums-list" style="display:none;"></div>
     </div>
 
-    <!-- ── Right: Curator form ── -->
+    <!-- Main card -->
     <div class="card">
-      <div class="card-body" id="upload-panel">
 
-        <div class="google-banner disconnected" id="google-banner">
-          <span class="google-icon">📷</span>
-          <div class="google-text">
-            <strong id="google-status-text">Google Photos not connected</strong>
-            <span id="google-status-sub">Connect to fetch and curate your trip photos</span>
+      <!-- Not connected: big connect wall -->
+      <div id="connect-wall">
+        <div class="wall-icon">📷</div>
+        <h2>Connect Google Photos</h2>
+        <p>Sign in to automatically detect trips and notable days,<br>suggest album names, and curate your best photos.</p>
+        <a href="/auth/login" class="btn-big-connect">
+          <span>🔗</span> Connect Google Photos
+        </a>
+      </div>
+
+      <!-- Connected: header strip -->
+      <div id="connected-strip">
+        <span>✓ Google Photos connected</span>
+        <button class="btn-disconnect" onclick="disconnect()">Disconnect</button>
+      </div>
+
+      <!-- Suggestions section -->
+      <div id="suggestions-section">
+        <div class="section-label" style="padding: 20px 32px 0;">Detected events</div>
+        <div style="padding: 12px 32px 0;">
+          <div class="suggestions-loading" id="suggestions-loading">Analyzing your photo library...</div>
+          <div class="suggestions-grid" id="suggestions-grid" style="display:none;"></div>
+          <div id="suggestions-empty" style="display:none;" class="suggestions-loading">No notable events found in the last <span id="days-searched">60</span> days.</div>
+
+          <!-- Expand to earlier dates -->
+          <div class="expand-row" id="expand-row" style="display:none;">
+            <span class="expand-label">Look further back:</span>
+            <input type="month" class="month-picker" id="expand-month" />
+            <button class="btn-expand" onclick="expandSearch()">Search</button>
           </div>
-          <button class="btn-connect connect" id="google-btn" onclick="handleGoogleBtn()">Connect</button>
+        </div>
+      </div>
+
+      <div class="divider" id="form-divider" style="display:none;"></div>
+
+      <!-- Manual / override form -->
+      <div id="form-section">
+        <div class="form-divider">
+          <div class="form-divider-line"></div>
+          <div class="form-divider-label">or set dates manually</div>
+          <div class="form-divider-line"></div>
         </div>
 
         <div class="field">
-          <div class="label">Album name</div>
+          <div class="section-label">Album name</div>
           <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026" />
         </div>
 
-        <div class="label">Trip dates</div>
+        <div class="section-label">Date range</div>
         <div class="date-row">
           <div class="field">
-            <div class="label">From</div>
+            <div class="section-label">From</div>
             <input type="date" id="start-date" />
           </div>
           <div class="field">
-            <div class="label">To</div>
+            <div class="section-label">To</div>
             <input type="date" id="end-date" />
           </div>
         </div>
 
-        <button class="btn-submit" id="submit-btn" disabled onclick="startCurate()">
+        <button class="btn-submit" id="submit-btn" onclick="startCurate()">
           Fetch &amp; Curate Photos
         </button>
       </div>
 
-      <div class="divider"></div>
+      <div class="divider" id="progress-divider" style="display:none;"></div>
 
       <!-- Progress -->
       <div id="progress-panel">
-        <div class="label">Pipeline progress</div>
+        <div class="section-label">Pipeline progress</div>
         <div class="stage-label" id="stage-label">Initializing...</div>
         <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
         <div class="stats-row">
-          <div class="stat">
-            <div class="stat-value" id="stat-total">—</div>
-            <div class="stat-label">Photos found</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value" id="stat-kept">—</div>
-            <div class="stat-label">Keepers selected</div>
-          </div>
+          <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Photos found</div></div>
+          <div class="stat"><div class="stat-value" id="stat-kept">—</div><div class="stat-label">Keepers selected</div></div>
         </div>
       </div>
 
@@ -235,20 +239,20 @@
       <div class="result" id="result-success">
         <div class="result-icon">🎞</div>
         <div class="result-title">Album ready</div>
-        <div class="result-sub" id="result-summary">Your best photos have been curated.</div>
+        <div class="result-sub" id="result-summary"></div>
         <a href="#" id="album-link" class="btn-album" target="_blank">Open in Google Photos →</a>
-        <button class="btn-reset" onclick="reset()">Curate another trip</button>
+        <button class="btn-reset" onclick="reset()">Curate another event</button>
       </div>
 
       <!-- Error -->
       <div class="result" id="result-error">
         <div class="result-icon">⚠️</div>
         <div class="result-title">Something went wrong</div>
-        <div class="error-msg" id="error-msg">—</div>
+        <div class="error-msg" id="error-msg"></div>
         <button class="btn-reset" style="margin-top:16px;" onclick="reset()">Try again</button>
       </div>
-    </div>
 
+    </div>
   </div>
 
   <div class="footer-note">
@@ -262,14 +266,43 @@
   const API = window.location.origin;
   let pollInterval = null;
   let googleConnected = false;
+  let selectedEvent = null;
+
+  // Event icons based on photo count / context
+  function eventIcon(event) {
+    if (event.photo_count >= 200) return '✈️';
+    if (event.photo_count >= 80) return '🏖️';
+    return '🎉';
+  }
+
+  function formatDateRange(start, end) {
+    const s = new Date(start + 'T12:00:00');
+    const e = new Date(end + 'T12:00:00');
+    const opts = { month: 'short', day: 'numeric' };
+    if (start === end) return s.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth())
+      return `${s.toLocaleDateString('en-US', opts)} – ${e.getDate()}, ${s.getFullYear()}`;
+    return `${s.toLocaleDateString('en-US', opts)} – ${e.toLocaleDateString('en-US', opts)}, ${e.getFullYear()}`;
+  }
 
   window.addEventListener('load', async () => {
+    // Default dates: 1 week
     const today = new Date();
-    const twoWeeksAgo = new Date(today);
-    twoWeeksAgo.setDate(today.getDate() - 14);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
     document.getElementById('end-date').value = today.toISOString().split('T')[0];
-    document.getElementById('start-date').value = twoWeeksAgo.toISOString().split('T')[0];
+    document.getElementById('start-date').value = weekAgo.toISOString().split('T')[0];
 
+    // Set expand month picker max to today
+    const ym = today.toISOString().slice(0, 7);
+    const expandEl = document.getElementById('expand-month');
+    expandEl.max = ym;
+    // Default to 3 months ago
+    const threeMonths = new Date(today);
+    threeMonths.setMonth(threeMonths.getMonth() - 3);
+    expandEl.value = threeMonths.toISOString().slice(0, 7);
+
+    // Handle OAuth redirect
     const params = new URLSearchParams(window.location.search);
     const auth = params.get('auth');
     if (auth === 'success') {
@@ -280,88 +313,147 @@
       window.history.replaceState({}, '', '/');
     }
 
-    await checkAuthStatus();
+    await checkAuth();
   });
 
-  async function checkAuthStatus() {
+  async function checkAuth() {
     try {
       const r = await fetch(`${API}/auth/status`);
       const { connected } = await r.json();
       googleConnected = connected;
-      updateGoogleBanner(connected);
-      updateSubmitBtn();
-      if (connected) loadAlbums();
-    } catch (e) {
-      updateGoogleBanner(false);
+      setConnectedState(connected);
+      if (connected) {
+        loadAlbums();
+        loadSuggestions();
+      }
+    } catch(e) {
+      setConnectedState(false);
     }
   }
 
-  function updateGoogleBanner(connected) {
-    const banner = document.getElementById('google-banner');
-    const text = document.getElementById('google-status-text');
-    const sub = document.getElementById('google-status-sub');
-    const btn = document.getElementById('google-btn');
-    if (connected) {
-      banner.className = 'google-banner connected';
-      text.textContent = 'Google Photos connected';
-      sub.textContent = 'Photos fetched directly from your library';
-      btn.textContent = 'Disconnect';
-      btn.className = 'btn-connect disconnect';
-    } else {
-      banner.className = 'google-banner disconnected';
-      text.textContent = 'Google Photos not connected';
-      sub.textContent = 'Connect to fetch and curate your trip photos';
-      btn.textContent = 'Connect';
-      btn.className = 'btn-connect connect';
-    }
+  function setConnectedState(connected) {
+    document.getElementById('connect-wall').style.display = connected ? 'none' : 'block';
+    const strip = document.getElementById('connected-strip');
+    connected ? strip.classList.add('show') : strip.classList.remove('show');
+    document.getElementById('suggestions-section').classList.toggle('show', connected);
+    document.getElementById('form-divider').style.display = connected ? 'block' : 'none';
+    document.getElementById('form-section').classList.toggle('show', connected);
+    document.getElementById('albums-placeholder').textContent = connected
+      ? 'Loading albums...' : 'Connect Google Photos\nto see your albums';
   }
 
-  function updateSubmitBtn() {
-    const start = document.getElementById('start-date').value;
-    const end = document.getElementById('end-date').value;
-    document.getElementById('submit-btn').disabled = !(googleConnected && start && end);
-  }
-
-  document.getElementById('start-date').addEventListener('change', updateSubmitBtn);
-  document.getElementById('end-date').addEventListener('change', updateSubmitBtn);
-
-  function handleGoogleBtn() {
-    if (googleConnected) disconnectGoogle();
-    else window.location.href = `${API}/auth/login`;
-  }
-
-  async function disconnectGoogle() {
+  async function disconnect() {
     await fetch(`${API}/auth/disconnect`, { method: 'POST' });
     googleConnected = false;
-    updateGoogleBanner(false);
-    updateSubmitBtn();
-    document.getElementById('albums-loading').style.display = 'block';
-    document.getElementById('albums-loading').textContent = 'Connect Google Photos\nto see your albums';
+    setConnectedState(false);
     document.getElementById('albums-list').style.display = 'none';
-    showToast('Google Photos disconnected');
+    document.getElementById('albums-placeholder').style.display = 'block';
+    document.getElementById('albums-placeholder').textContent = 'Connect Google Photos\nto see your albums';
+    showToast('Disconnected');
+  }
+
+  // ── Suggestions ──
+  async function loadSuggestions(days) {
+    const grid = document.getElementById('suggestions-grid');
+    const loading = document.getElementById('suggestions-loading');
+    const empty = document.getElementById('suggestions-empty');
+    const expandRow = document.getElementById('expand-row');
+
+    grid.style.display = 'none';
+    empty.style.display = 'none';
+    expandRow.style.display = 'none';
+    loading.style.display = 'block';
+    loading.textContent = 'Analyzing your photo library...';
+
+    try {
+      const url = days ? `${API}/api/events?days=${days}` : `${API}/api/events`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('Failed');
+      const { events, days_searched } = await r.json();
+
+      document.getElementById('days-searched').textContent = days_searched;
+      loading.style.display = 'none';
+      expandRow.style.display = 'flex';
+
+      if (!events || events.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+
+      grid.innerHTML = '';
+      grid.style.display = 'flex';
+
+      events.forEach(event => {
+        const card = document.createElement('button');
+        card.className = 'event-card';
+        card.onclick = () => selectEvent(event, card);
+
+        const dateStr = formatDateRange(event.start, event.end);
+        const locStr = event.location ? `📍 ${event.location}` : '';
+        const parts = [dateStr, locStr].filter(Boolean);
+
+        card.innerHTML = `
+          <span class="event-icon">${eventIcon(event)}</span>
+          <div class="event-info">
+            <div class="event-name">${escHtml(event.album_name)}</div>
+            <div class="event-meta">${escHtml(parts.join('  ·  '))}</div>
+          </div>
+          <span class="event-count">${event.photo_count} photos</span>
+        `;
+        grid.appendChild(card);
+      });
+
+    } catch(e) {
+      loading.textContent = 'Could not load suggestions.';
+      expandRow.style.display = 'flex';
+    }
+  }
+
+  function selectEvent(event, cardEl) {
+    // Deselect all
+    document.querySelectorAll('.event-card').forEach(c => c.classList.remove('selected'));
+    cardEl.classList.add('selected');
+    selectedEvent = event;
+
+    // Pre-fill form
+    document.getElementById('album-name').value = event.album_name;
+    document.getElementById('start-date').value = event.start;
+    document.getElementById('end-date').value = event.end;
+
+    // Scroll to form on mobile
+    document.getElementById('form-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function expandSearch() {
+    const month = document.getElementById('expand-month').value;
+    if (!month) return;
+    // Calculate days from that month to today
+    const then = new Date(month + '-01');
+    const now = new Date();
+    const days = Math.ceil((now - then) / (1000 * 60 * 60 * 24)) + 31;
+    await loadSuggestions(Math.min(days, 365));
   }
 
   // ── Albums ──
   async function loadAlbums() {
-    const loading = document.getElementById('albums-loading');
+    const placeholder = document.getElementById('albums-placeholder');
     const list = document.getElementById('albums-list');
-    loading.style.display = 'block';
-    loading.textContent = 'Loading albums...';
+    placeholder.style.display = 'block';
+    placeholder.textContent = 'Loading albums...';
     list.style.display = 'none';
 
     try {
       const r = await fetch(`${API}/api/albums`);
-      if (!r.ok) throw new Error('Failed to load');
+      if (!r.ok) throw new Error('Failed');
       const { albums } = await r.json();
 
       list.innerHTML = '';
-
       if (!albums || albums.length === 0) {
-        loading.textContent = 'No albums found in your library.';
+        placeholder.textContent = 'No albums found.';
         return;
       }
 
-      loading.style.display = 'none';
+      placeholder.style.display = 'none';
       list.style.display = 'flex';
 
       albums.forEach(album => {
@@ -375,43 +467,36 @@
           ? `<img class="album-thumb" src="${album.cover_url}" alt="" loading="lazy" onerror="this.style.display='none'">`
           : `<div class="album-thumb-placeholder">🖼</div>`;
 
-        const metaParts = [];
-        if (album.date_range) metaParts.push(album.date_range);
-        if (album.photo_count) metaParts.push(`${album.photo_count} photos`);
-        const meta2 = album.location ? album.location : '';
+        const meta1 = [album.date_range, album.photo_count ? `${album.photo_count} photos` : null].filter(Boolean).join(' · ');
+        const meta2 = album.location ? `📍 ${album.location}` : '';
 
         card.innerHTML = `
           ${thumb}
           <div class="album-info">
             <div class="album-title">${escHtml(album.title)}</div>
-            ${metaParts.length ? `<div class="album-meta">${escHtml(metaParts.join(' · '))}</div>` : ''}
-            ${meta2 ? `<div class="album-meta">📍 ${escHtml(meta2)}</div>` : ''}
+            ${meta1 ? `<div class="album-meta">${escHtml(meta1)}</div>` : ''}
+            ${meta2 ? `<div class="album-meta">${escHtml(meta2)}</div>` : ''}
           </div>
           ${album.created_by_app ? '<div class="app-badge">Curated</div>' : ''}
         `;
-
         list.appendChild(card);
       });
-
-    } catch (e) {
-      loading.style.display = 'block';
-      loading.textContent = 'Could not load albums.';
+    } catch(e) {
+      placeholder.textContent = 'Could not load albums.';
     }
-  }
-
-  function escHtml(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   // ── Curate ──
   async function startCurate() {
     const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
     const startDate = document.getElementById('start-date').value;
-    const endDate = document.getElementById('end-date').value;
-    if (!startDate || !endDate) return;
+    const endDate   = document.getElementById('end-date').value;
+
+    if (!startDate || !endDate) { showToast('Please select a date range'); return; }
     if (endDate < startDate) { showToast('✗ End date must be after start date'); return; }
 
     document.getElementById('submit-btn').disabled = true;
+    document.getElementById('progress-divider').style.display = 'block';
     document.getElementById('progress-panel').classList.add('show');
     document.getElementById('stage-label').textContent = 'Starting...';
 
@@ -424,7 +509,7 @@
       if (!r.ok) { const err = await r.json(); showError(err.detail || 'Failed to start'); return; }
       const { job_id } = await r.json();
       pollJob(job_id);
-    } catch (err) {
+    } catch(err) {
       showError(err.message);
     }
   }
@@ -437,35 +522,29 @@
         document.getElementById('stage-label').textContent = job.stage || '...';
         document.getElementById('progress-fill').style.width = (job.progress || 0) + '%';
         if (job.total) document.getElementById('stat-total').textContent = job.total.toLocaleString();
-        if (job.kept) document.getElementById('stat-kept').textContent = job.kept.toLocaleString();
-        if (job.status === 'done') { clearInterval(pollInterval); showDone(job); loadAlbums(); }
-        else if (job.status === 'error') { clearInterval(pollInterval); showError(job.error || 'Unknown error'); }
-      } catch (err) {}
+        if (job.kept)  document.getElementById('stat-kept').textContent  = job.kept.toLocaleString();
+        if (job.status === 'done')  { clearInterval(pollInterval); showDone(job); loadAlbums(); }
+        if (job.status === 'error') { clearInterval(pollInterval); showError(job.error || 'Unknown error'); }
+      } catch(e) {}
     }, 2000);
   }
 
   function showDone(job) {
     document.getElementById('progress-panel').classList.remove('show');
-    const total = job.total || '?';
-    const kept = job.kept || '?';
+    document.getElementById('progress-divider').style.display = 'none';
     const pct = job.total ? Math.round((job.kept / job.total) * 100) : '?';
     document.getElementById('result-summary').textContent =
-      `${kept} keepers selected from ${total} photos (${pct}%). All duplicates removed.`;
+      `${job.kept} keepers selected from ${job.total} photos (${pct}%). All duplicates removed.`;
     document.getElementById('album-link').href = job.album_url;
     document.getElementById('result-success').classList.add('show');
   }
 
   function showError(msg) {
     document.getElementById('progress-panel').classList.remove('show');
+    document.getElementById('progress-divider').style.display = 'none';
     document.getElementById('error-msg').textContent = msg;
     document.getElementById('result-error').classList.add('show');
-  }
-
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    document.getElementById('submit-btn').disabled = false;
   }
 
   function reset() {
@@ -475,8 +554,21 @@
     document.getElementById('progress-panel').classList.remove('show');
     document.getElementById('result-success').classList.remove('show');
     document.getElementById('result-error').classList.remove('show');
+    document.getElementById('submit-btn').disabled = false;
+    document.querySelectorAll('.event-card').forEach(c => c.classList.remove('selected'));
+    selectedEvent = null;
     clearInterval(pollInterval);
-    updateSubmitBtn();
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
 </body>
