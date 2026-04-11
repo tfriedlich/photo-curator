@@ -229,16 +229,16 @@ async def score_with_claude(path: Path) -> float:
 
 
 # ── stage 5: google photos upload ─────────────────────────────────────────────
-async def upload_to_google_photos(paths: list[Path], album_name: str) -> Optional[str]:
+async def upload_to_google_photos(paths: list[Path], album_name: str, access_token: str) -> Optional[str]:
     """
     Upload curated photos to a new Google Photos album.
     Returns the album URL or None if no token is set.
     """
-    if not GOOGLE_PHOTOS_TOKEN:
+    if not access_token:
         return None
 
     headers = {
-        "Authorization": f"Bearer {GOOGLE_PHOTOS_TOKEN}",
+        "Authorization": f"Bearer {access_token}",
         "Content-type": "application/json",
     }
 
@@ -263,7 +263,7 @@ async def upload_to_google_photos(paths: list[Path], album_name: str) -> Optiona
                 data = f.read()
 
             upload_headers = {
-                "Authorization": f"Bearer {GOOGLE_PHOTOS_TOKEN}",
+                "Authorization": f"Bearer {access_token}",
                 "Content-type": "application/octet-stream",
                 "X-Goog-Upload-Content-Type": "image/jpeg",
                 "X-Goog-Upload-Protocol": "raw",
@@ -295,7 +295,7 @@ async def upload_to_google_photos(paths: list[Path], album_name: str) -> Optiona
 
 
 # ── main pipeline ──────────────────────────────────────────────────────────────
-async def run_pipeline(job_id: str, zip_path: Path, album_name: str):
+async def run_pipeline(job_id: str, zip_path: Path, album_name: str, access_token: str = ""):
     try:
         # 1. Extract
         update_job(job_id, status="running", stage="Extracting ZIP", progress=5)
@@ -360,7 +360,7 @@ async def run_pipeline(job_id: str, zip_path: Path, album_name: str):
         update_job(job_id, kept=len(keeper_paths), stage="Uploading to Google Photos", progress=88)
 
         # 7. Upload
-        album_url = await upload_to_google_photos(keeper_paths, album_name)
+        album_url = await upload_to_google_photos(keeper_paths, album_name, access_token)
 
         update_job(
             job_id,

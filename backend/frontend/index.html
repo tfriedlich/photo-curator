@@ -23,346 +23,105 @@
       --shadow: rgba(26,22,18,0.12);
     }
 
-    html, body {
-      height: 100%;
-      background: var(--paper);
-      color: var(--ink);
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 300;
-    }
+    html, body { height: 100%; background: var(--paper); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 300; }
 
-    body {
+    body { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 48px 24px 80px; }
+
+    header { text-align: center; margin-bottom: 56px; }
+    .wordmark { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700; letter-spacing: -1px; color: var(--ink); line-height: 1; }
+    .wordmark em { font-style: italic; color: var(--amber); }
+    .tagline { margin-top: 10px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .ornament { text-align: center; color: var(--amber); font-size: 18px; letter-spacing: 8px; margin: 8px 0 40px; }
+
+    .card { width: 100%; max-width: 560px; background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 2px 24px var(--shadow); overflow: hidden; }
+    .card-body { padding: 40px; }
+    .label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .divider { height: 1px; background: var(--border); margin: 0; }
+
+    /* Google connect banner */
+    .google-banner {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      min-height: 100vh;
-      padding: 48px 24px 80px;
-    }
-
-    /* ── header ── */
-    header {
-      text-align: center;
-      margin-bottom: 56px;
-    }
-
-    .wordmark {
-      font-family: 'Playfair Display', serif;
-      font-size: 42px;
-      font-weight: 700;
-      letter-spacing: -1px;
-      color: var(--ink);
-      line-height: 1;
-    }
-
-    .wordmark em {
-      font-style: italic;
-      color: var(--amber);
-    }
-
-    .tagline {
-      margin-top: 10px;
-      font-size: 13px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-    }
-
-    /* ── card ── */
-    .card {
-      width: 100%;
-      max-width: 560px;
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      box-shadow: 0 2px 24px var(--shadow);
-      overflow: hidden;
-    }
-
-    .card-body {
-      padding: 40px;
-    }
-
-    /* ── section labels ── */
-    .label {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-
-    /* ── album name input ── */
-    .field {
+      gap: 14px;
+      padding: 16px 20px;
+      border-radius: 3px;
       margin-bottom: 28px;
-    }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 12px 16px;
       border: 1px solid var(--border);
-      border-radius: 3px;
       background: var(--paper);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 15px;
-      color: var(--ink);
-      outline: none;
-      transition: border-color 0.2s;
     }
+    .google-banner.connected { border-color: #86efac; background: #f0fdf4; }
+    .google-banner.disconnected { border-color: #fca5a5; background: #fef2f2; }
 
-    input[type="text"]:focus {
-      border-color: var(--amber);
-    }
+    .google-icon { font-size: 22px; flex-shrink: 0; }
+    .google-text { flex: 1; }
+    .google-text strong { display: block; font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
+    .google-text span { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
 
-    /* ── drop zone ── */
-    .dropzone {
-      border: 2px dashed var(--border);
+    .btn-connect {
+      padding: 9px 18px;
       border-radius: 3px;
-      padding: 48px 32px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: var(--amber-pale);
-      position: relative;
-    }
-
-    .dropzone:hover, .dropzone.drag-over {
-      border-color: var(--amber);
-      background: #fef8ed;
-    }
-
-    .dropzone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-
-    .drop-icon {
-      font-size: 36px;
-      margin-bottom: 12px;
-      display: block;
-    }
-
-    .drop-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 18px;
-      color: var(--ink);
-      margin-bottom: 6px;
-    }
-
-    .drop-sub {
       font-size: 12px;
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-    }
-
-    .file-selected {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 16px;
-      background: var(--cream);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      margin-top: 12px;
-    }
-
-    .file-selected.show { display: flex; }
-
-    .file-icon { font-size: 20px; }
-
-    .file-name {
-      font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      color: var(--ink);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-
-    .file-size {
-      font-size: 11px;
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-      white-space: nowrap;
-    }
-
-    /* ── submit button ── */
-    .btn-submit {
-      width: 100%;
-      margin-top: 28px;
-      padding: 16px;
-      background: var(--amber);
-      color: white;
-      border: none;
-      border-radius: 3px;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
       font-weight: 500;
-      letter-spacing: 0.05em;
+      font-family: 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      border: none;
+      white-space: nowrap;
+      transition: background 0.2s;
     }
+    .btn-connect.connect { background: var(--amber); color: white; }
+    .btn-connect.connect:hover { background: #b8782a; }
+    .btn-connect.disconnect { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
+    .btn-connect.disconnect:hover { background: var(--border); }
 
+    .field { margin-bottom: 28px; }
+    input[type="text"] { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--ink); outline: none; transition: border-color 0.2s; }
+    input[type="text"]:focus { border-color: var(--amber); }
+
+    .dropzone { border: 2px dashed var(--border); border-radius: 3px; padding: 48px 32px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--amber-pale); position: relative; }
+    .dropzone:hover, .dropzone.drag-over { border-color: var(--amber); background: #fef8ed; }
+    .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { font-size: 36px; margin-bottom: 12px; display: block; }
+    .drop-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+    .drop-sub { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    .file-selected { display: none; align-items: center; gap: 12px; padding: 14px 16px; background: var(--cream); border: 1px solid var(--border); border-radius: 3px; margin-top: 12px; }
+    .file-selected.show { display: flex; }
+    .file-icon { font-size: 20px; }
+    .file-name { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .file-size { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
+
+    .btn-submit { width: 100%; margin-top: 28px; padding: 16px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 0.05em; cursor: pointer; transition: background 0.2s, transform 0.1s; }
     .btn-submit:hover:not(:disabled) { background: #b8782a; }
     .btn-submit:active:not(:disabled) { transform: scale(0.99); }
     .btn-submit:disabled { background: var(--muted); cursor: not-allowed; }
 
-    /* ── divider ── */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 0;
-    }
-
-    /* ── progress panel ── */
-    #progress-panel {
-      display: none;
-      padding: 32px 40px 40px;
-    }
-
+    /* Progress */
+    #progress-panel { display: none; padding: 32px 40px 40px; }
     #progress-panel.show { display: block; }
+    .stage-label { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink); margin-bottom: 14px; min-height: 18px; }
+    .progress-track { height: 4px; background: var(--cream); border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
+    .progress-fill { height: 100%; background: var(--amber); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+    .stats-row { display: flex; gap: 24px; }
+    .stat { flex: 1; background: var(--paper); border: 1px solid var(--border); border-radius: 3px; padding: 14px 16px; }
+    .stat-value { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--ink); line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
 
-    .stage-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      color: var(--ink);
-      margin-bottom: 14px;
-      min-height: 18px;
-    }
-
-    .progress-track {
-      height: 4px;
-      background: var(--cream);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-bottom: 20px;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: var(--amber);
-      border-radius: 2px;
-      transition: width 0.4s ease;
-      width: 0%;
-    }
-
-    .stats-row {
-      display: flex;
-      gap: 24px;
-    }
-
-    .stat {
-      flex: 1;
-      background: var(--paper);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 14px 16px;
-    }
-
-    .stat-value {
-      font-family: 'Playfair Display', serif;
-      font-size: 28px;
-      color: var(--ink);
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .stat-label {
-      font-size: 10px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-    }
-
-    /* ── result states ── */
-    .result {
-      display: none;
-      padding: 28px 40px 40px;
-      text-align: center;
-    }
-
+    /* Results */
+    .result { display: none; padding: 28px 40px 40px; text-align: center; }
     .result.show { display: block; }
-
     .result-icon { font-size: 40px; margin-bottom: 14px; }
-
-    .result-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      margin-bottom: 8px;
-    }
-
-    .result-sub {
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 24px;
-      line-height: 1.6;
-    }
-
-    .btn-album {
-      display: inline-block;
-      padding: 13px 28px;
-      background: var(--amber);
-      color: white;
-      text-decoration: none;
-      border-radius: 3px;
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: 0.05em;
-      transition: background 0.2s;
-      margin-bottom: 16px;
-    }
-
+    .result-title { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 8px; }
+    .result-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
+    .btn-album { display: inline-block; padding: 13px 28px; background: var(--amber); color: white; text-decoration: none; border-radius: 3px; font-size: 13px; font-weight: 500; letter-spacing: 0.05em; transition: background 0.2s; margin-bottom: 16px; }
     .btn-album:hover { background: #b8782a; }
+    .btn-reset { display: block; margin: 12px auto 0; background: none; border: none; color: var(--muted); font-size: 12px; font-family: 'DM Mono', monospace; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+    .error-msg { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 3px; padding: 14px 16px; font-size: 13px; color: var(--red); font-family: 'DM Mono', monospace; word-break: break-word; }
 
-    .btn-reset {
-      display: block;
-      margin: 12px auto 0;
-      background: none;
-      border: none;
-      color: var(--muted);
-      font-size: 12px;
-      font-family: 'DM Mono', monospace;
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
+    .footer-note { margin-top: 32px; text-align: center; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; line-height: 1.8; }
 
-    .error-msg {
-      background: #fef2f2;
-      border: 1px solid #fca5a5;
-      border-radius: 3px;
-      padding: 14px 16px;
-      font-size: 13px;
-      color: var(--red);
-      font-family: 'DM Mono', monospace;
-      word-break: break-word;
-    }
-
-    /* ── footer note ── */
-    .footer-note {
-      margin-top: 32px;
-      text-align: center;
-      font-size: 11px;
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-      line-height: 1.8;
-    }
-
-    /* ── decorative rule ── */
-    .ornament {
-      text-align: center;
-      color: var(--amber);
-      font-size: 18px;
-      letter-spacing: 8px;
-      margin: 8px 0 40px;
-    }
+    /* Auth success toast */
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 12px 24px; border-radius: 3px; font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -374,9 +133,17 @@
   </header>
 
   <div class="card">
-
-    <!-- Upload form -->
     <div class="card-body" id="upload-panel">
+
+      <!-- Google Photos connection -->
+      <div class="google-banner disconnected" id="google-banner">
+        <span class="google-icon">📷</span>
+        <div class="google-text">
+          <strong id="google-status-text">Google Photos not connected</strong>
+          <span id="google-status-sub">Connect to automatically create your curated album</span>
+        </div>
+        <button class="btn-connect connect" id="google-btn" onclick="handleGoogleBtn()">Connect</button>
+      </div>
 
       <div class="field">
         <div class="label">Album name</div>
@@ -438,7 +205,7 @@
       <div class="result-title">Curation complete</div>
       <div class="result-sub" id="result-no-token-summary">Photos scored and selected.</div>
       <div class="error-msg" style="text-align:left; margin-bottom:16px;">
-        No Google Photos token configured — set <code>GOOGLE_PHOTOS_TOKEN</code> in Railway env vars to enable album creation.
+        Google Photos not connected — use the Connect button to enable album creation next time.
       </div>
       <button class="btn-reset" onclick="reset()">Curate another trip</button>
     </div>
@@ -450,7 +217,6 @@
       <div class="error-msg" id="error-msg">—</div>
       <button class="btn-reset" style="margin-top:20px;" onclick="reset()">Try again</button>
     </div>
-
   </div>
 
   <div class="footer-note">
@@ -458,13 +224,76 @@
     Typical cost: $1–3 per trip · Typical time: 5–15 min for 1,000 photos
   </div>
 
-<script>
-  const API = window.location.origin; // same origin when served from Railway
+  <div class="toast" id="toast"></div>
 
+<script>
+  const API = window.location.origin;
   let selectedFile = null;
   let pollInterval = null;
+  let googleConnected = false;
 
-  // ── drag & drop ──
+  // Check auth status on load + handle redirect params
+  window.addEventListener('load', async () => {
+    const params = new URLSearchParams(window.location.search);
+    const auth = params.get('auth');
+    if (auth === 'success') {
+      showToast('✓ Google Photos connected');
+      window.history.replaceState({}, '', '/');
+    } else if (auth === 'error') {
+      showToast('✗ Google connection failed: ' + (params.get('reason') || 'unknown'));
+      window.history.replaceState({}, '', '/');
+    }
+    await checkAuthStatus();
+  });
+
+  async function checkAuthStatus() {
+    try {
+      const r = await fetch(`${API}/auth/status`);
+      const { connected } = await r.json();
+      googleConnected = connected;
+      updateGoogleBanner(connected);
+    } catch (e) {
+      updateGoogleBanner(false);
+    }
+  }
+
+  function updateGoogleBanner(connected) {
+    const banner = document.getElementById('google-banner');
+    const text = document.getElementById('google-status-text');
+    const sub = document.getElementById('google-status-sub');
+    const btn = document.getElementById('google-btn');
+
+    if (connected) {
+      banner.className = 'google-banner connected';
+      text.textContent = 'Google Photos connected';
+      sub.textContent = 'Curated album will be created automatically';
+      btn.textContent = 'Disconnect';
+      btn.className = 'btn-connect disconnect';
+    } else {
+      banner.className = 'google-banner disconnected';
+      text.textContent = 'Google Photos not connected';
+      sub.textContent = 'Connect to automatically create your curated album';
+      btn.textContent = 'Connect';
+      btn.className = 'btn-connect connect';
+    }
+  }
+
+  function handleGoogleBtn() {
+    if (googleConnected) {
+      disconnectGoogle();
+    } else {
+      window.location.href = `${API}/auth/login`;
+    }
+  }
+
+  async function disconnectGoogle() {
+    await fetch(`${API}/auth/disconnect`, { method: 'POST' });
+    googleConnected = false;
+    updateGoogleBanner(false);
+    showToast('Google Photos disconnected');
+  }
+
+  // Drag & drop
   const dz = document.getElementById('dropzone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
@@ -494,13 +323,9 @@
     return (b / 1e3).toFixed(0) + ' KB';
   }
 
-  // ── upload & poll ──
   async function startUpload() {
     if (!selectedFile) return;
-
     const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
-
-    // Show progress panel
     document.getElementById('submit-btn').disabled = true;
     document.getElementById('progress-panel').classList.add('show');
     document.getElementById('stage-label').textContent = 'Uploading ZIP...';
@@ -523,23 +348,13 @@
       try {
         const r = await fetch(`${API}/api/status/${jobId}`);
         const job = await r.json();
-
-        // Update UI
         document.getElementById('stage-label').textContent = job.stage || '...';
         document.getElementById('progress-fill').style.width = (job.progress || 0) + '%';
         if (job.total) document.getElementById('stat-total').textContent = job.total.toLocaleString();
         if (job.kept) document.getElementById('stat-kept').textContent = job.kept.toLocaleString();
-
-        if (job.status === 'done') {
-          clearInterval(pollInterval);
-          showDone(job);
-        } else if (job.status === 'error') {
-          clearInterval(pollInterval);
-          showError(job.error || 'Unknown error');
-        }
-      } catch (err) {
-        // network hiccup, keep polling
-      }
+        if (job.status === 'done') { clearInterval(pollInterval); showDone(job); }
+        else if (job.status === 'error') { clearInterval(pollInterval); showError(job.error || 'Unknown error'); }
+      } catch (err) {}
     }, 2000);
   }
 
@@ -564,6 +379,13 @@
     document.getElementById('progress-panel').classList.remove('show');
     document.getElementById('error-msg').textContent = msg;
     document.getElementById('result-error').classList.add('show');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
   }
 
   function reset() {
