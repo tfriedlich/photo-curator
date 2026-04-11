@@ -7,3 +7,4 @@ google_token.pickle
 /tmp/
 *.zip
 .DS_Store
+google_photo_api_creds.txt 
