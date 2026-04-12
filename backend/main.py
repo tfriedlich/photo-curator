@@ -298,13 +298,21 @@ async def adjust_ratio(job_id: str, req: RatioRequest):
     return {"ok": True, "kept": kept}
 
 
+class ConfirmRequest(BaseModel):
+    existing_album_id: str = ""
+    existing_album_url: str = ""
+
 @app.post("/api/confirm/{job_id}")
-async def confirm_album(job_id: str, background_tasks: BackgroundTasks):
+async def confirm_album(job_id: str, req: ConfirmRequest, background_tasks: BackgroundTasks):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     if job["status"] != "preview_ready": raise HTTPException(400, "Not in preview state")
     access_token = await get_valid_token()
-    background_tasks.add_task(confirm_and_upload, job_id, access_token, created_album_ids)
+    background_tasks.add_task(
+        confirm_and_upload, job_id, access_token, created_album_ids,
+        req.existing_album_id or None,
+        req.existing_album_url or None,
+    )
     return {"ok": True}
 
 

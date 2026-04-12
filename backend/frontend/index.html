@@ -11,7 +11,7 @@
     :root {
       --ink: #1a1612; --paper: #f5f0e8; --cream: #ede8de; --amber: #c8883a;
       --amber-pale: #fdf4e3; --red: #c94040; --muted: #8a7f72; --green: #3a7a5a;
-      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12); --blue: #2563eb;
+      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12);
     }
     html, body { min-height: 100%; background: var(--paper); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 300; }
     body { display: flex; flex-direction: column; align-items: center; padding: 48px 24px 80px; }
@@ -41,6 +41,20 @@
     .btn-connect.connect:hover { background: #b8782a; }
     .btn-connect.disconnect { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
 
+    /* Trip in progress banner */
+    #trip-banner { display: none; margin-bottom: 24px; }
+    #trip-banner.show { display: block; }
+    .trip-card { border: 2px solid var(--amber); border-radius: 3px; background: var(--amber-pale); overflow: hidden; }
+    .trip-card-header { padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    .trip-icon { font-size: 20px; }
+    .trip-info { flex: 1; }
+    .trip-name { font-size: 14px; font-weight: 500; color: var(--ink); font-family: 'Playfair Display', serif; }
+    .trip-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+    .btn-trip-continue { padding: 9px 16px; background: var(--amber); color: white; border: none; border-radius: 3px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+    .btn-trip-continue:hover { background: #b8782a; }
+    .btn-trip-new { padding: 9px 12px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; margin-left: 6px; }
+    .btn-trip-new:hover { background: var(--cream); }
+
     /* Method tabs */
     .method-tabs { display: flex; gap: 0; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
     .method-tab { flex: 1; padding: 11px 16px; background: var(--paper); border: none; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: background 0.15s; color: var(--muted); border-right: 1px solid var(--border); }
@@ -48,21 +62,23 @@
     .method-tab.active { background: white; color: var(--ink); font-weight: 500; }
     .method-tab:hover:not(.active) { background: var(--cream); }
 
+    /* Album mode toggle */
+    .album-mode { display: flex; gap: 8px; margin-bottom: 20px; }
+    .album-mode-btn { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; color: var(--muted); text-align: center; }
+    .album-mode-btn.active { border-color: var(--amber); background: var(--amber-pale); color: var(--ink); font-weight: 500; }
+
     /* Picker section */
     #picker-section { display: none; }
     #picker-section.show { display: block; }
-    .picker-btn { width: 100%; padding: 18px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'Playfair Display', serif; font-size: 18px; cursor: pointer; transition: background 0.2s; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .picker-btn { width: 100%; padding: 16px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .picker-btn:hover:not(:disabled) { background: #b8782a; }
     .picker-btn:disabled { background: var(--muted); cursor: not-allowed; }
-    .picker-note { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; text-align: center; line-height: 1.6; margin-bottom: 16px; }
-
-    /* Picker waiting state */
-    #picker-waiting { display: none; padding: 20px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 3px; margin-bottom: 16px; text-align: center; }
+    .picker-note { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; text-align: center; line-height: 1.6; margin-bottom: 4px; }
+    #picker-waiting { display: none; padding: 18px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 3px; margin-bottom: 16px; text-align: center; }
     #picker-waiting.show { display: block; }
-    .picker-waiting-icon { font-size: 28px; margin-bottom: 8px; }
-    .picker-waiting-title { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+    .picker-waiting-title { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
     .picker-waiting-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
-    .btn-picker-open { display: inline-block; margin-top: 12px; padding: 10px 20px; background: var(--blue); color: white; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 500; }
+    .btn-picker-reopen { display: inline-block; margin-top: 10px; padding: 8px 16px; background: #2563eb; color: white; text-decoration: none; border-radius: 3px; font-size: 11px; font-weight: 500; }
 
     /* ZIP section */
     #zip-section { display: none; }
@@ -70,7 +86,6 @@
     .how-to { background: var(--cream); border: 1px solid var(--border); border-radius: 3px; padding: 14px 16px; margin-bottom: 20px; font-size: 12px; color: var(--muted); line-height: 1.7; }
     .how-to strong { color: var(--ink); font-weight: 500; }
     .how-to a { color: var(--amber); text-decoration: none; }
-    .how-to a:hover { text-decoration: underline; }
 
     /* Inputs */
     input[type="text"] { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); outline: none; transition: border-color 0.2s; }
@@ -159,6 +174,8 @@
     .result-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
     .btn-album { display: inline-block; padding: 12px 24px; background: var(--amber); color: white; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 500; transition: background 0.2s; margin-bottom: 12px; }
     .btn-album:hover { background: #b8782a; }
+    .btn-next-day { display: block; width: fit-content; margin: 8px auto; padding: 10px 20px; background: var(--green); color: white; border: none; border-radius: 3px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .btn-next-day:hover { background: #2d6648; }
     .btn-reset { display: block; margin: 8px auto 0; background: none; border: none; color: var(--muted); font-size: 11px; font-family: 'DM Mono', monospace; cursor: pointer; text-decoration: underline; }
     .error-msg { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 3px; padding: 12px 14px; font-size: 12px; color: var(--red); font-family: 'DM Mono', monospace; word-break: break-word; text-align: left; }
 
@@ -171,7 +188,7 @@
   <header>
     <div class="wordmark">Photo <em>Curator</em></div>
     <div class="ornament">✦ ✦ ✦</div>
-    <div class="tagline">Trip photos → curated album, automatically</div>
+    <div class="tagline">Trip photos → curated album, day by day</div>
   </header>
 
   <div class="card">
@@ -187,8 +204,23 @@
         <button class="btn-connect connect" id="google-btn" onclick="handleGoogleBtn()">Connect</button>
       </div>
 
-      <!-- Album name -->
-      <div class="field">
+      <!-- Trip in progress -->
+      <div id="trip-banner">
+        <div class="trip-card">
+          <div class="trip-card-header">
+            <span class="trip-icon">✈️</span>
+            <div class="trip-info">
+              <div class="trip-name" id="trip-name-display">Trip in progress</div>
+              <div class="trip-meta" id="trip-meta-display">Loading...</div>
+            </div>
+            <button class="btn-trip-continue" onclick="continueTrip()">+ Add day</button>
+            <button class="btn-trip-new" onclick="confirmNewTrip()">New trip</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Album name (only shown for new trips) -->
+      <div class="field" id="album-name-field">
         <span class="slabel">Album name</span>
         <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026"/>
       </div>
@@ -202,29 +234,24 @@
       <!-- Picker section -->
       <div id="picker-section" class="show">
         <div id="picker-waiting">
-          <div class="picker-waiting-icon">🖼</div>
-          <div class="picker-waiting-title">Google Photos picker is open</div>
-          <div class="picker-waiting-sub">Select your trip photos or album, then click Done in Google Photos.<br>This page will automatically continue when you're finished.</div>
-          <a href="#" id="picker-link" target="_blank" class="btn-picker-open">Open Google Photos picker →</a>
+          <div class="picker-waiting-title">📸 Google Photos picker is open</div>
+          <div class="picker-waiting-sub">Select your photos, then click Done in Google Photos.<br>This page will continue automatically.</div>
+          <a href="#" id="picker-link" target="_blank" class="btn-picker-reopen">Re-open picker →</a>
         </div>
         <button class="picker-btn" id="picker-btn" onclick="startPicker()" disabled>
           <span>🖼</span> Open Google Photos Picker
         </button>
-        <div class="picker-note">
-          Opens Google Photos in a new tab · Select your trip photos or album · Returns here automatically
-        </div>
+        <div class="picker-note">Opens Google Photos · Select today's photos · Returns here automatically</div>
       </div>
 
       <!-- ZIP section -->
       <div id="zip-section">
         <div class="how-to">
-          <strong>How to export your trip photos:</strong><br>
-          1. Go to <a href="https://takeout.google.com" target="_blank">takeout.google.com</a><br>
-          2. Select only <strong>Google Photos</strong> → choose your trip album<br>
-          3. Export as ZIP → download when ready (10–30 min)<br>
-          4. Upload the ZIP below
+          <strong>Export from Google Takeout:</strong><br>
+          1. Go to <a href="https://takeout.google.com" target="_blank">takeout.google.com</a> → Google Photos<br>
+          2. Select the date range for this day/session<br>
+          3. Export as ZIP → upload below
         </div>
-
         <span class="slabel">Google Takeout ZIP</span>
         <div class="dropzone" id="dropzone">
           <input type="file" id="file-input" accept=".zip"/>
@@ -272,25 +299,28 @@
       <div class="preview-days" id="preview-days"></div>
       <div class="confirm-bar">
         <div class="confirm-summary" id="confirm-summary"></div>
-        <button class="btn-back" onclick="backToForm()">← Start over</button>
-        <button class="btn-confirm" id="confirm-btn" onclick="confirmAlbum()">Create Album →</button>
+        <button class="btn-back" onclick="backToForm()">← Back</button>
+        <button class="btn-confirm" id="confirm-btn" onclick="confirmAlbum()">
+          <span id="confirm-btn-label">Add to Album →</span>
+        </button>
       </div>
     </div>
 
     <!-- Uploading -->
     <div id="uploading-panel">
       <div class="up-icon">⚙️</div>
-      <div class="up-title">Creating your album...</div>
+      <div class="up-title" id="uploading-title">Adding to your album...</div>
       <div class="up-stage" id="upload-stage">Uploading photos</div>
     </div>
 
     <!-- Success -->
     <div class="result" id="result-success">
       <div class="result-icon">🎞</div>
-      <div class="result-title">Album ready</div>
+      <div class="result-title" id="result-title">Day added to album</div>
       <div class="result-sub" id="result-summary"></div>
-      <a href="#" id="album-link" class="btn-album" target="_blank">Open in Google Photos →</a>
-      <button class="btn-reset" onclick="reset()">Curate another trip</button>
+      <a href="#" id="album-link" class="btn-album" target="_blank">Open album in Google Photos →</a>
+      <button class="btn-next-day" onclick="nextDay()">+ Add another day →</button>
+      <button class="btn-reset" onclick="finishTrip()">Trip complete — start fresh</button>
     </div>
 
     <!-- Error -->
@@ -303,13 +333,13 @@
   </div>
 
   <div class="footer-note">
-    Select photos via Google Photos Picker or upload a Takeout ZIP<br>
-    AI scores each photo · Filters unflattering shots · Preview before creating album
+    Curate day by day · Each session adds to your trip album · Progress saved in browser
   </div>
   <div class="toast" id="toast"></div>
 
 <script>
   const API = window.location.origin;
+  const STORAGE_KEY = 'photo_curator_trip';
   let selectedFile = null;
   let pollInterval = null;
   let pickerPollInterval = null;
@@ -318,15 +348,102 @@
   let currentSessionId = null;
   let googleConnected = false;
   let activeTab = 'picker';
+  let tripState = null; // {albumId, albumUrl, albumName, daysAdded, totalKept}
 
+  // ── Init ──
   window.addEventListener('load', async () => {
     const params = new URLSearchParams(window.location.search);
     const auth = params.get('auth');
     if (auth === 'success') { showToast('✓ Google Photos connected'); history.replaceState({},'','/'); }
     else if (auth === 'error') { showToast('✗ ' + (params.get('reason') || 'Connection failed')); history.replaceState({},'','/'); }
+
+    loadTripState();
     await checkAuth();
   });
 
+  // ── Trip state (localStorage) ──
+  function loadTripState() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        tripState = JSON.parse(saved);
+        showTripBanner();
+      }
+    } catch(e) {}
+  }
+
+  function saveTripState(albumId, albumUrl, albumName, kept) {
+    tripState = tripState || { albumId, albumUrl, albumName, daysAdded: 0, totalKept: 0 };
+    tripState.albumId = albumId;
+    tripState.albumUrl = albumUrl;
+    tripState.albumName = albumName;
+    tripState.daysAdded = (tripState.daysAdded || 0) + 1;
+    tripState.totalKept = (tripState.totalKept || 0) + kept;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
+  }
+
+  function clearTripState() {
+    tripState = null;
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function showTripBanner() {
+    if (!tripState) return;
+    document.getElementById('trip-banner').classList.add('show');
+    document.getElementById('trip-name-display').textContent = tripState.albumName;
+    document.getElementById('trip-meta-display').textContent =
+      `${tripState.daysAdded} day${tripState.daysAdded !== 1 ? 's' : ''} curated · ${tripState.totalKept} photos added · tap to continue`;
+    document.getElementById('album-name-field').style.display = 'none';
+    document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
+  }
+
+  function continueTrip() {
+    // Already set up -- just hide banner context, user picks photos
+    showToast(`Adding to "${tripState.albumName}"`);
+  }
+
+  function confirmNewTrip() {
+    if (confirm(`Start a new trip? This will end "${tripState.albumName}".`)) {
+      clearTripState();
+      document.getElementById('trip-banner').classList.remove('show');
+      document.getElementById('album-name-field').style.display = 'block';
+      document.getElementById('confirm-btn-label').textContent = 'Create Album →';
+    }
+  }
+
+  function nextDay() {
+    showSection('none');
+    document.getElementById('zip-submit-btn').disabled = selectedFile ? false : true;
+    document.getElementById('picker-btn').disabled = !googleConnected;
+    document.getElementById('confirm-btn').disabled = false;
+    document.getElementById('confirm-btn').textContent = 'Add to Album →';
+    document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
+    selectedFile = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-selected').classList.remove('show');
+    document.getElementById('picker-waiting').classList.remove('show');
+    document.getElementById('picker-btn').innerHTML = '<span>🖼</span> Open Google Photos Picker';
+    clearInterval(pollInterval);
+    clearInterval(pickerPollInterval);
+    showTripBanner();
+  }
+
+  function finishTrip() {
+    clearTripState();
+    document.getElementById('trip-banner').classList.remove('show');
+    document.getElementById('album-name-field').style.display = 'block';
+    showSection('none');
+    selectedFile = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-selected').classList.remove('show');
+    document.getElementById('zip-submit-btn').disabled = true;
+    document.getElementById('picker-btn').disabled = !googleConnected;
+    document.getElementById('confirm-btn-label').textContent = 'Create Album →';
+    clearInterval(pollInterval);
+    clearInterval(pickerPollInterval);
+  }
+
+  // ── Auth ──
   async function checkAuth() {
     try {
       const { connected } = await (await fetch(`${API}/auth/status`)).json();
@@ -344,13 +461,13 @@
     if (connected) {
       banner.className = 'google-banner connected';
       text.textContent = 'Google Photos connected';
-      sub.textContent = 'Ready to select and curate your trip photos';
+      sub.textContent = 'Ready to curate your trip photos';
       btn.textContent = 'Disconnect';
       btn.className = 'btn-connect disconnect';
     } else {
       banner.className = 'google-banner disconnected';
       text.textContent = 'Google Photos not connected';
-      sub.textContent = 'Connect to select photos and create albums automatically';
+      sub.textContent = 'Connect to select photos and create albums';
       btn.textContent = 'Connect';
       btn.className = 'btn-connect connect';
     }
@@ -370,7 +487,7 @@
     }
   }
 
-  // ── Tab switching ──
+  // ── Tabs ──
   function switchTab(tab) {
     activeTab = tab;
     document.getElementById('tab-picker').classList.toggle('active', tab === 'picker');
@@ -379,28 +496,24 @@
     document.getElementById('zip-section').classList.toggle('show', tab === 'zip');
   }
 
-  // ── Picker flow ──
+  // ── Picker ──
   async function startPicker() {
     if (!googleConnected) { showToast('Connect Google Photos first'); return; }
     const btn = document.getElementById('picker-btn');
     btn.disabled = true;
-    btn.textContent = 'Opening picker...';
+    btn.innerHTML = '<span>🔄</span> Opening picker...';
 
     try {
       const r = await fetch(`${API}/api/picker/session`, { method: 'POST' });
-      if (!r.ok) { const err = await r.json(); showToast(err.detail || 'Failed to create session'); btn.disabled = false; btn.innerHTML = '<span>🖼</span> Open Google Photos Picker'; return; }
+      if (!r.ok) { const err = await r.json(); showToast(err.detail || 'Failed'); btn.disabled = false; btn.innerHTML = '<span>🖼</span> Open Google Photos Picker'; return; }
       const { session_id, picker_uri } = await r.json();
       currentSessionId = session_id;
 
-      // Show waiting state and open picker
-      const pickerLink = document.getElementById('picker-link');
-      pickerLink.href = picker_uri + '/autoclose';
+      document.getElementById('picker-link').href = picker_uri + '/autoclose';
       document.getElementById('picker-waiting').classList.add('show');
       window.open(picker_uri + '/autoclose', '_blank');
-
       btn.innerHTML = '<span>🔄</span> Waiting for selection...';
 
-      // Poll for completion
       pickerPollInterval = setInterval(async () => {
         try {
           const pr = await fetch(`${API}/api/picker/session/${session_id}`);
@@ -414,7 +527,6 @@
           }
         } catch(e) {}
       }, 3000);
-
     } catch(err) {
       showToast('Failed: ' + err.message);
       btn.disabled = false;
@@ -423,9 +535,8 @@
   }
 
   async function startPickerCurate(sessionId) {
-    const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
+    const albumName = tripState ? tripState.albumName : (document.getElementById('album-name').value.trim() || 'Best Of Trip');
     showSection('progress');
-
     try {
       const r = await fetch(`${API}/api/picker/curate?session_id=${encodeURIComponent(sessionId)}&album_name=${encodeURIComponent(albumName)}`, { method: 'POST' });
       if (!r.ok) { const err = await r.json(); showError(err.detail || 'Failed to start'); return; }
@@ -435,7 +546,7 @@
     } catch(err) { showError(err.message); }
   }
 
-  // ── ZIP flow ──
+  // ── ZIP ──
   const dz = document.getElementById('dropzone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
@@ -458,7 +569,7 @@
 
   async function startZipUpload() {
     if (!selectedFile) return;
-    const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
+    const albumName = tripState ? tripState.albumName : (document.getElementById('album-name').value.trim() || 'Best Of Trip');
     document.getElementById('zip-submit-btn').disabled = true;
     showSection('progress');
 
@@ -475,7 +586,7 @@
     } catch(err) { showError(err.message); }
   }
 
-  // ── Shared job polling ──
+  // ── Polling ──
   function pollJob(jobId) {
     pollInterval = setInterval(async () => {
       try {
@@ -538,7 +649,6 @@
     card.className = `photo-card${photo.removed?' removed':''}${photo.enhanced?' enhanced':''}`;
     card.id = `card-${photo.id}`;
     const imgSrc = `${API}/api/preview/${jobId}/thumb/${photo.filename}`;
-    const hasAlt = photo.has_alternatives;
     card.innerHTML = `
       <img class="photo-img" src="${imgSrc}" alt="" loading="lazy">
       <div class="photo-score">${photo.score}</div>
@@ -547,7 +657,7 @@
         ${photo.removed
           ? `<button class="photo-action restore" onclick="restorePhoto('${photo.id}','${dayDate}')">↩ Restore</button>`
           : `<button class="photo-action" onclick="removePhoto('${photo.id}','${dayDate}')">✕</button>
-             <button class="photo-action" onclick="swapPhoto('${photo.id}','${dayDate}')" ${!hasAlt?'disabled':''}>↻</button>
+             <button class="photo-action" onclick="swapPhoto('${photo.id}','${dayDate}')" ${!photo.has_alternatives?'disabled':''}>↻</button>
              <button class="photo-action" onclick="enhancePhoto('${photo.id}','${dayDate}')">✨</button>`
         }
       </div>
@@ -576,15 +686,11 @@
 
   async function removePhoto(photoId, dayDate) {
     await fetch(`${API}/api/preview/${currentJobId}/remove`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
-    const photo = findPhoto(photoId, dayDate);
-    if (photo) { photo.removed = true; refreshCard(photo, dayDate); }
+    const photo = findPhoto(photoId, dayDate); if (photo) { photo.removed = true; refreshCard(photo, dayDate); }
   }
-
   function restorePhoto(photoId, dayDate) {
-    const photo = findPhoto(photoId, dayDate);
-    if (photo) { photo.removed = false; refreshCard(photo, dayDate); }
+    const photo = findPhoto(photoId, dayDate); if (photo) { photo.removed = false; refreshCard(photo, dayDate); }
   }
-
   async function swapPhoto(photoId, dayDate) {
     try {
       const r = await fetch(`${API}/api/preview/${currentJobId}/swap`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
@@ -594,14 +700,13 @@
       if (day) { const idx = day.photos.findIndex(p => p.id === photoId); if (idx >= 0) { day.photos[idx] = new_photo; const old = document.getElementById(`card-${photoId}`); if (old) old.replaceWith(makePhotoCard(new_photo, dayDate, currentJobId)); } }
     } catch(e) { showToast('Swap failed'); }
   }
-
   async function enhancePhoto(photoId, dayDate) {
     try {
       const r = await fetch(`${API}/api/preview/${currentJobId}/enhance`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
       if (!r.ok) { showToast('Enhancement failed'); return; }
       const { description } = await r.json();
       const photo = findPhoto(photoId, dayDate);
-      if (photo) { photo.enhanced = true; photo.enhance_description = description; const img = document.querySelector(`#card-${photoId} .photo-img`); if (img) img.src = img.src + '?t='+Date.now(); refreshCard(photo, dayDate); showToast('✨ ' + description); }
+      if (photo) { photo.enhanced = true; photo.enhance_description = description; const img = document.querySelector(`#card-${photoId} .photo-img`); if (img) img.src = img.src+'?t='+Date.now(); refreshCard(photo, dayDate); showToast('✨ '+description); }
     } catch(e) { showToast('Enhancement failed'); }
   }
 
@@ -614,17 +719,16 @@
     }, 400);
   }
 
-  function countKept() { return previewState ? previewState.days.reduce((s,d) => s + d.photos.filter(p=>!p.removed).length, 0) : 0; }
+  function countKept() { return previewState ? previewState.days.reduce((s,d) => s+d.photos.filter(p=>!p.removed).length, 0) : 0; }
   function updateDayCount(dayDate) {
-    const day = previewState.days.find(d => d.date === dayDate);
-    if (!day) return;
-    const kept = day.photos.filter(p => !p.removed).length;
+    const day = previewState.days.find(d => d.date === dayDate); if (!day) return;
+    const kept = day.photos.filter(p=>!p.removed).length;
     const grid = document.getElementById(`grid-${dayDate}`);
-    if (grid) { const countEl = grid.previousElementSibling?.querySelector('.day-count'); if (countEl) countEl.textContent = `${kept} of ${day.photos_found} kept`; }
+    if (grid) { const el = grid.previousElementSibling?.querySelector('.day-count'); if (el) el.textContent = `${kept} of ${day.photos_found} kept`; }
   }
   function updateConfirmSummary() {
     const kept = countKept();
-    const enhanced = previewState?.days.reduce((s,d) => s + d.photos.filter(p=>p.enhanced).length, 0) || 0;
+    const enhanced = previewState?.days.reduce((s,d)=>s+d.photos.filter(p=>p.enhanced).length,0)||0;
     let text = `<strong>${kept} photos</strong> selected`;
     if (enhanced > 0) text += ` · ${enhanced} enhanced`;
     document.getElementById('confirm-summary').innerHTML = text;
@@ -632,21 +736,43 @@
 
   async function confirmAlbum() {
     const btn = document.getElementById('confirm-btn');
-    btn.disabled = true; btn.textContent = 'Creating...';
+    btn.disabled = true;
+    document.getElementById('confirm-btn-label').textContent = 'Adding...';
+
+    // Use existing album if trip in progress
+    const existingAlbumId = tripState?.albumId || '';
+    const existingAlbumUrl = tripState?.albumUrl || '';
+
     try {
-      const r = await fetch(`${API}/api/confirm/${currentJobId}`, { method: 'POST' });
+      const r = await fetch(`${API}/api/confirm/${currentJobId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ existing_album_id: existingAlbumId, existing_album_url: existingAlbumUrl }),
+      });
       if (!r.ok) { const err = await r.json(); showError(err.detail||'Confirm failed'); return; }
+      const albumName = tripState?.albumName || previewState?.album_name || 'Best Of Trip';
+      document.getElementById('uploading-title').textContent = tripState ? 'Adding to your album...' : 'Creating your album...';
       showSection('uploading');
       pollUpload(currentJobId);
-    } catch(e) { showError(e.message); btn.disabled = false; btn.textContent = 'Create Album →'; }
+    } catch(e) { showError(e.message); btn.disabled = false; document.getElementById('confirm-btn-label').textContent = 'Add to Album →'; }
   }
 
   function backToForm() { showSection('none'); document.getElementById('zip-submit-btn').disabled = selectedFile ? false : true; document.getElementById('picker-btn').disabled = !googleConnected; }
 
   function showDone(job) {
     const pct = job.total ? Math.round((job.kept/job.total)*100) : '?';
-    document.getElementById('result-summary').textContent = `${job.kept} photos in your new album (${pct}% of ${job.total} found). Unflattering shots and duplicates removed.`;
-    document.getElementById('album-link').href = job.album_url === 'no_google_token' ? '#' : job.album_url;
+    const albumName = tripState?.albumName || previewState?.album_name || 'Best Of Trip';
+    const albumUrl = job.album_url === 'no_google_token' ? '#' : job.album_url;
+    const albumId = job.album_id || tripState?.albumId || '';
+
+    // Save trip state
+    saveTripState(albumId, albumUrl, albumName, job.kept);
+
+    const isFirst = tripState.daysAdded === 1;
+    document.getElementById('result-title').textContent = isFirst ? 'Album created!' : 'Day added to album';
+    document.getElementById('result-summary').textContent =
+      `${job.kept} photos added (${pct}% of ${job.total} found). Trip total: ${tripState.totalKept} photos across ${tripState.daysAdded} day${tripState.daysAdded!==1?'s':''}.`;
+    document.getElementById('album-link').href = albumUrl;
     showSection('success');
   }
 
@@ -678,7 +804,7 @@
     document.getElementById('stat-total').textContent = '—';
     document.getElementById('stat-kept').textContent = '—';
     document.getElementById('confirm-btn').disabled = false;
-    document.getElementById('confirm-btn').textContent = 'Create Album →';
+    document.getElementById('confirm-btn-label').textContent = tripState ? 'Add to Album →' : 'Create Album →';
     showSection('none');
     clearInterval(pollInterval);
     clearInterval(pickerPollInterval);

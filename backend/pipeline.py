@@ -349,21 +349,27 @@ async def enhance_photo(path: Path, enhance_notes: str) -> tuple[Path, str]:
 
 
 # ── Stage 7: Upload to Google Photos ──────────────────────────────────────────
-async def upload_to_google_photos(paths, album_name, access_token):
+async def upload_to_google_photos(paths, album_name, access_token,
+                                   existing_album_id=None, existing_album_url=None):
     if not access_token:
         return None, None
     headers = {"Authorization": f"Bearer {access_token}", "Content-type": "application/json"}
     async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(
-            "https://photoslibrary.googleapis.com/v1/albums",
-            headers=headers,
-            json={"album": {"title": album_name}},
-        )
-        album = r.json()
-        album_id = album.get("id")
-        album_url = album.get("productUrl")
-        if not album_id:
-            return None, None
+        # Use existing album or create new one
+        if existing_album_id:
+            album_id = existing_album_id
+            album_url = existing_album_url
+        else:
+            r = await client.post(
+                "https://photoslibrary.googleapis.com/v1/albums",
+                headers=headers,
+                json={"album": {"title": album_name}},
+            )
+            album = r.json()
+            album_id = album.get("id")
+            album_url = album.get("productUrl")
+            if not album_id:
+                return None, None
 
         media_item_tokens = []
         for path in paths:
@@ -575,7 +581,8 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
             shutil.rmtree(work_dir_path)
 
 
-async def confirm_and_upload(job_id, access_token, created_album_ids=None):
+async def confirm_and_upload(job_id, access_token, created_album_ids=None,
+                             existing_album_id=None, existing_album_url=None):
     """Upload the approved photo set to Google Photos."""
     try:
         job = job_store[job_id]
@@ -583,21 +590,24 @@ async def confirm_and_upload(job_id, access_token, created_album_ids=None):
         preview = job["preview"]
         album_name = preview["album_name"]
 
-        update_job(job_id, status="uploading", stage="Creating Google Photos album", progress=92)
+        stage = "Adding to album" if existing_album_id else "Creating Google Photos album"
+        update_job(job_id, status="uploading", stage=stage, progress=92)
 
         # Collect approved, non-removed photos
         keeper_paths = []
         for day in preview["days"]:
             for photo in day["photos"]:
                 if not photo.get("removed"):
-                    # Use enhanced version if available
                     filename = photo["filename"]
                     enhanced = filename.replace(".", "_enhanced.", 1) if photo.get("enhanced") else None
                     path = work_dir / (enhanced if enhanced and (work_dir / enhanced).exists() else filename)
                     if path.exists():
                         keeper_paths.append(path)
 
-        album_url, album_id = await upload_to_google_photos(keeper_paths, album_name, access_token)
+        album_url, album_id = await upload_to_google_photos(
+            keeper_paths, album_name, access_token,
+            existing_album_id, existing_album_url
+        )
 
         if album_id and created_album_ids is not None:
             created_album_ids.add(album_id)
@@ -609,6 +619,7 @@ async def confirm_and_upload(job_id, access_token, created_album_ids=None):
             progress=100,
             kept=len(keeper_paths),
             album_url=album_url or "no_google_token",
+            album_id=album_id or "",
         )
 
         # Cleanup
