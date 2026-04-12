@@ -482,10 +482,22 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
                 pct = 42 + int((i / len(candidates)) * 30)
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
-        # 6. Select keepers
-        flattering = [img for img in scored if img["flattering"] and img.get("score", 5.0) >= config.MIN_SCORE]
+        # 6. Select keepers using smart cluster picking
+        from pipeline import pick_best_from_cluster
+        scored_by_cluster = {}
+        for img in scored:
+            idx = img["cluster_idx"]
+            if idx not in scored_by_cluster:
+                scored_by_cluster[idx] = []
+            scored_by_cluster[idx].append(img)
+
+        pre_keepers = []
+        for idx, cluster_members in scored_by_cluster.items():
+            picks = pick_best_from_cluster(cluster_members, max_keep=2)
+            pre_keepers.extend(picks)
+
+        flattering = [img for img in pre_keepers if img.get("flattering", True) and img.get("score", 5.0) >= config.MIN_SCORE]
         flattering.sort(key=lambda x: x["score"], reverse=True)
-        # For small sessions apply stricter ratio; always respect MIN_SCORE cutoff
         session_ratio = config.TARGET_KEEP_RATIO
         if total_found < 100:
             session_ratio = min(config.TARGET_KEEP_RATIO, 0.30)
@@ -699,10 +711,22 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
                 pct = 50 + int((i / len(candidates)) * 26)
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
-        # 6. Select keepers
-        flattering = [img for img in scored if img["flattering"] and img.get("score", 5.0) >= config.MIN_SCORE]
+        # 6. Select keepers using smart cluster picking
+        from pipeline import pick_best_from_cluster
+        scored_by_cluster = {}
+        for img in scored:
+            idx = img["cluster_idx"]
+            if idx not in scored_by_cluster:
+                scored_by_cluster[idx] = []
+            scored_by_cluster[idx].append(img)
+
+        pre_keepers = []
+        for idx, cluster_members in scored_by_cluster.items():
+            picks = pick_best_from_cluster(cluster_members, max_keep=2)
+            pre_keepers.extend(picks)
+
+        flattering = [img for img in pre_keepers if img.get("flattering", True) and img.get("score", 5.0) >= config.MIN_SCORE]
         flattering.sort(key=lambda x: x["score"], reverse=True)
-        # For small sessions apply stricter ratio; always respect MIN_SCORE cutoff
         session_ratio = config.TARGET_KEEP_RATIO
         if total_found < 100:
             session_ratio = min(config.TARGET_KEEP_RATIO, 0.30)

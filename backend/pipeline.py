@@ -140,30 +140,48 @@ def perceptual_hash(path):
 
 # ── Stage 3: Clustering ────────────────────────────────────────────────────────
 def cluster_duplicates(images):
-    clusters = []
-    used = set()
-    for i, img in enumerate(images):
-        if i in used:
-            continue
-        cluster = [img]
-        used.add(i)
-        for j, other in enumerate(images):
-            if j in used or j == i:
-                continue
-            if img["hash"] and other["hash"]:
+    """
+    Two-pass clustering:
+    1. Hash similarity (visually near-identical)
+    2. Timestamp proximity (same moment, different angle)
+    Then merge overlapping clusters.
+    """
+    n = len(images)
+    # Union-Find for efficient merging
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(x, y):
+        parent[find(x)] = find(y)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            # Hash similarity check
+            if images[i]["hash"] and images[j]["hash"]:
                 try:
-                    if img["hash"] - other["hash"] <= config.DUPLICATE_HASH_THRESHOLD:
-                        cluster.append(other)
-                        used.add(j)
+                    if images[i]["hash"] - images[j]["hash"] <= config.DUPLICATE_HASH_THRESHOLD:
+                        union(i, j)
                         continue
                 except Exception:
                     pass
-            if img["dt"] and other["dt"]:
-                if abs((img["dt"] - other["dt"]).total_seconds()) <= config.BURST_WINDOW_SECONDS:
-                    cluster.append(other)
-                    used.add(j)
-        clusters.append(cluster)
-    return clusters
+            # Timestamp proximity check
+            if images[i]["dt"] and images[j]["dt"]:
+                delta = abs((images[i]["dt"] - images[j]["dt"]).total_seconds())
+                if delta <= config.BURST_WINDOW_SECONDS:
+                    union(i, j)
+
+    # Group by cluster root
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for i, img in enumerate(images):
+        groups[find(i)].append(img)
+
+    return list(groups.values())
 
 
 # ── Stage 4: Claude Vision scoring ────────────────────────────────────────────
