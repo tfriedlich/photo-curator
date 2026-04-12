@@ -22,6 +22,7 @@ REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
 GOOGLE_SCOPES = " ".join([
     "https://www.googleapis.com/auth/photoslibrary.readonly",
     "https://www.googleapis.com/auth/photoslibrary.appendonly",
+    "https://www.googleapis.com/auth/photoslibrary",
 ])
 
 # Token store -- seeded from env vars on startup
