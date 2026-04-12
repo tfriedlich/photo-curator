@@ -2,6 +2,7 @@ import os
 import shutil
 import base64
 import asyncio
+import json
 from pathlib import Path
 from datetime import datetime, date
 from typing import Optional
@@ -10,99 +11,52 @@ import httpx
 from state import job_store
 import config
 
-# ── constants ──────────────────────────────────────────────────────────────────
 WORK_DIR = Path("/tmp/photo-curator/jobs")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"}
-GOOGLE_PHOTOS_PAGE_SIZE = 100  # max allowed by API
-
-# Pull from config (env-driven)
-TARGET_KEEP_RATIO        = config.TARGET_KEEP_RATIO
-DUPLICATE_HASH_THRESHOLD = config.DUPLICATE_HASH_THRESHOLD
-BURST_WINDOW_SECONDS     = config.BURST_WINDOW_SECONDS
-ANTHROPIC_API_KEY        = config.ANTHROPIC_API_KEY
-
+GOOGLE_PHOTOS_PAGE_SIZE = 100
 
 def update_job(job_id: str, **kwargs):
     job_store[job_id].update(kwargs)
 
 
-# ── stage 1: fetch from Google Photos API ─────────────────────────────────────
-async def fetch_media_items(
-    access_token: str,
-    start_date: date,
-    end_date: date,
-    job_id: str,
-) -> list[dict]:
-    """
-    Page through Google Photos mediaItems.search for a date range.
-    Returns list of {id, filename, baseUrl, mimeType, creationTime}.
-    """
+# ── Stage 1: Fetch from Google Photos ─────────────────────────────────────────
+async def fetch_media_items(access_token, start_date, end_date, job_id):
     headers = {"Authorization": f"Bearer {access_token}"}
     items = []
     next_page_token = None
-
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
             body = {
                 "pageSize": GOOGLE_PHOTOS_PAGE_SIZE,
                 "filters": {
-                    "dateFilter": {
-                        "ranges": [{
-                            "startDate": {"year": start_date.year, "month": start_date.month, "day": start_date.day},
-                            "endDate":   {"year": end_date.year,   "month": end_date.month,   "day": end_date.day},
-                        }]
-                    },
+                    "dateFilter": {"ranges": [{"startDate": {"year": start_date.year, "month": start_date.month, "day": start_date.day}, "endDate": {"year": end_date.year, "month": end_date.month, "day": end_date.day}}]},
                     "mediaTypeFilter": {"mediaTypes": ["PHOTO"]},
                     "includeArchivedMedia": True,
                 },
             }
             if next_page_token:
                 body["pageToken"] = next_page_token
-
-            r = await client.post(
-                "https://photoslibrary.googleapis.com/v1/mediaItems:search",
-                headers=headers,
-                json=body,
-            )
+            r = await client.post("https://photoslibrary.googleapis.com/v1/mediaItems:search", headers=headers, json=body)
             data = r.json()
-
             if "error" in data:
                 raise Exception(f"Google Photos API error: {data['error'].get('message', str(data['error']))}")
-
             batch = data.get("mediaItems", [])
             items.extend(batch)
-
             update_job(job_id, stage=f"Fetching photo list... ({len(items)} found)", progress=8)
-
             next_page_token = data.get("nextPageToken")
             if not next_page_token:
                 break
-
-            # Respect rate limits
             await asyncio.sleep(0.1)
-
     return items
 
 
-async def download_photo(
-    item: dict,
-    dest_dir: Path,
-    access_token: str,
-    client: httpx.AsyncClient,
-) -> Optional[Path]:
-    """Download a single photo to dest_dir. Returns path or None on failure."""
+async def download_photo(item, dest_dir, access_token, client):
     try:
-        # baseUrl must have =d appended to get full original download
         url = item["baseUrl"] + "=d"
         filename = item.get("filename", item["id"] + ".jpg")
         dest = dest_dir / filename
-
-        # Avoid filename collisions
         if dest.exists():
-            stem = dest.stem
-            suffix = dest.suffix
-            dest = dest_dir / f"{stem}_{item['id'][:8]}{suffix}"
-
+            dest = dest_dir / f"{dest.stem}_{item['id'][:8]}{dest.suffix}"
         r = await client.get(url, headers={"Authorization": f"Bearer {access_token}"})
         if r.status_code == 200:
             dest.write_bytes(r.content)
@@ -112,39 +66,28 @@ async def download_photo(
     return None
 
 
-async def download_all_photos(
-    items: list[dict],
-    dest_dir: Path,
-    access_token: str,
-    job_id: str,
-) -> list[Path]:
-    """Download all photos with concurrency limit to avoid rate limiting."""
+async def download_all_photos(items, dest_dir, access_token, job_id):
     dest_dir.mkdir(parents=True, exist_ok=True)
-    paths = []
-    semaphore = asyncio.Semaphore(8)  # max 8 concurrent downloads
-
+    semaphore = asyncio.Semaphore(8)
     async def bounded_download(item, idx):
         async with semaphore:
             async with httpx.AsyncClient(timeout=60) as client:
                 path = await download_photo(item, dest_dir, access_token, client)
                 if idx % 25 == 0:
-                    pct = 10 + int((idx / len(items)) * 25)
+                    pct = 10 + int((idx / len(items)) * 20)
                     update_job(job_id, stage=f"Downloading photos ({idx}/{len(items)})", progress=pct)
-                return path
-
+                return path, item
     tasks = [bounded_download(item, i) for i, item in enumerate(items)]
     results = await asyncio.gather(*tasks)
-    paths = [p for p in results if p is not None]
-    return paths
+    return [(p, item) for p, item in results if p is not None]
 
 
-# ── stage 2: cheap filters ─────────────────────────────────────────────────────
-def is_screenshot(path: Path) -> bool:
+# ── Stage 2: Cheap filters ─────────────────────────────────────────────────────
+def is_screenshot(path):
     name = path.name.lower()
-    return "screenshot" in name or "screen shot" in name or "screen_shot" in name
+    return "screenshot" in name or "screen shot" in name
 
-
-def get_exif_datetime(path: Path) -> Optional[datetime]:
+def get_exif_datetime(path):
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS
@@ -153,15 +96,13 @@ def get_exif_datetime(path: Path) -> Optional[datetime]:
         if not exif_data:
             return None
         for tag_id, value in exif_data.items():
-            tag = TAGS.get(tag_id, tag_id)
-            if tag == "DateTimeOriginal":
+            if TAGS.get(tag_id, tag_id) == "DateTimeOriginal":
                 return datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
     except Exception:
         pass
     return None
 
-
-def blur_score(path: Path) -> float:
+def blur_score(path):
     try:
         import cv2
         img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
@@ -175,74 +116,64 @@ def blur_score(path: Path) -> float:
     except Exception:
         return 0.0
 
-
-def exposure_score(path: Path) -> float:
+def exposure_score(path):
     try:
         from PIL import Image
         import numpy as np
         img = Image.open(path).convert("L").resize((200, 200))
         arr = np.array(img, dtype=float)
         mean = arr.mean()
-        if mean < 30:
-            return 0.1
-        if mean > 240:
-            return 0.2
+        if mean < 30: return 0.1
+        if mean > 240: return 0.2
         return 1.0 - abs(mean - 128) / 128
     except Exception:
         return 0.5
 
-
-def perceptual_hash(path: Path):
+def perceptual_hash(path):
     try:
         import imagehash
         from PIL import Image
-        img = Image.open(path).convert("RGB")
-        return imagehash.phash(img)
+        return imagehash.phash(Image.open(path).convert("RGB"))
     except Exception:
         return None
 
 
-# ── stage 3: clustering ────────────────────────────────────────────────────────
-def cluster_duplicates(images: list[dict]) -> list[list[dict]]:
+# ── Stage 3: Clustering ────────────────────────────────────────────────────────
+def cluster_duplicates(images):
     clusters = []
     used = set()
-
     for i, img in enumerate(images):
         if i in used:
             continue
         cluster = [img]
         used.add(i)
-
         for j, other in enumerate(images):
             if j in used or j == i:
                 continue
             if img["hash"] and other["hash"]:
                 try:
-                    if img["hash"] - other["hash"] <= DUPLICATE_HASH_THRESHOLD:
+                    if img["hash"] - other["hash"] <= config.DUPLICATE_HASH_THRESHOLD:
                         cluster.append(other)
                         used.add(j)
                         continue
                 except Exception:
                     pass
             if img["dt"] and other["dt"]:
-                delta = abs((img["dt"] - other["dt"]).total_seconds())
-                if delta <= BURST_WINDOW_SECONDS:
+                if abs((img["dt"] - other["dt"]).total_seconds()) <= config.BURST_WINDOW_SECONDS:
                     cluster.append(other)
                     used.add(j)
-
         clusters.append(cluster)
-
     return clusters
 
 
-def pick_best_cheap(cluster: list[dict]) -> dict:
-    return max(cluster, key=lambda x: x["blur"] * 0.6 + x["exposure"] * 0.4)
+# ── Stage 4: Claude Vision scoring ────────────────────────────────────────────
+async def score_with_claude(path: Path) -> dict:
+    """
+    Returns structured scoring including flattering check and scene tags.
+    """
+    if not config.ANTHROPIC_API_KEY:
+        return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
 
-
-# ── stage 4: claude vision scoring ────────────────────────────────────────────
-async def score_with_claude(path: Path) -> float:
-    if not ANTHROPIC_API_KEY:
-        return 5.0
     try:
         from PIL import Image
         import io
@@ -252,50 +183,176 @@ async def score_with_claude(path: Path) -> float:
         img.save(buf, format="JPEG", quality=75)
         b64 = base64.b64encode(buf.getvalue()).decode()
 
+        prompt = """Analyze this personal trip photo and respond with ONLY valid JSON, no markdown, no explanation.
+
+Return exactly this structure:
+{
+  "score": <1-10 float, overall keeper quality>,
+  "scene": "<2-4 word scene description e.g. beach swimming, city sightseeing, restaurant dinner, waterfall hiking, wildlife viewing, hotel arrival, family portrait>",
+  "flattering": <true or false - are ALL people in the photo looking good? Eyes open, good expression, not mid-blink, not caught awkwardly, lighting is kind to faces>,
+  "unflattering_reason": <null if flattering=true, otherwise brief reason e.g. "eyes closed", "mid-expression", "unflattering angle", "harsh shadows on face">,
+  "enhance_notes": <null if photo looks great, otherwise brief specific notes e.g. "slightly underexposed", "warm color cast", "slightly soft focus", "needs contrast boost">
+}
+
+Scoring guide:
+- 9-10: Perfect shot, everyone looks great, excellent composition, genuine moment
+- 7-8: Good photo, minor technical issues or slightly staged
+- 5-6: Acceptable, some issues with composition or lighting
+- 3-4: Poor quality, bad lighting, or unflattering (even if technically sharp)
+- 1-2: Should not be in an album (accidental shot, test photo, very blurry)
+
+Be honest about flattering - a technically sharp photo where someone looks bad should score low and flattering=false."""
+
         payload = {
             "model": "claude-sonnet-4-20250514",
-            "max_tokens": 100,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
-                    {"type": "text", "text": (
-                        "Score this photo as a memory worth keeping from a personal trip. "
-                        "Consider: sharpness, exposure, subject interest, faces visible and clear, "
-                        "composition, and whether it captures a genuine moment. "
-                        "Respond with ONLY a single number from 1 to 10. Nothing else."
-                    )},
-                ],
-            }],
+            "max_tokens": 200,
+            "messages": [{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                {"type": "text", "text": prompt},
+            ]}],
         }
 
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(
                 "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
+                headers={"x-api-key": config.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
                 json=payload,
             )
             text = r.json()["content"][0]["text"].strip()
-            return float(text)
+            # Strip markdown fences if present
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+            return json.loads(text.strip())
+    except Exception as e:
+        return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
+
+
+# ── Stage 5: Trip narrative naming ────────────────────────────────────────────
+async def generate_trip_narrative(days_summary: list[dict], album_name: str) -> dict[str, str]:
+    """
+    Single Claude call to name all days as a coherent travel narrative.
+    Returns {date_str: day_name}
+    """
+    if not config.ANTHROPIC_API_KEY or not days_summary:
+        return {}
+
+    try:
+        days_text = "\n".join(
+            f"Day {i+1} ({d['date']}): {d['photo_count']} photos, locations: {d['locations'] or 'unknown'}, scenes: {d['scenes'] or 'various'}"
+            for i, d in enumerate(days_summary)
+        )
+
+        prompt = f"""You are naming days of a personal photo album called "{album_name}".
+
+Here are the days:
+{days_text}
+
+Give each day a short evocative name (4-8 words) that fits a travel narrative arc.
+- Day 1 should feel like arrival/beginning
+- Last day should feel like departure/final morning  
+- Middle days should capture the main activity or location
+- Be specific and evocative, not generic
+- Format: "Location · Activity or Mood" e.g. "Arenal · Volcano Hike & Hot Springs" or "Touching Down · San José"
+- For home/local events: "Lily's 10th Birthday · Backyard Party" or "Sunday at the Beach · Long Island"
+
+Respond with ONLY valid JSON mapping date to name, no markdown:
+{{{", ".join(f'"{d["date"]}": "<name>"' for d in days_summary)}}}"""
+
+        payload = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 500,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": config.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json=payload,
+            )
+            text = r.json()["content"][0]["text"].strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+            return json.loads(text.strip())
     except Exception:
-        return 5.0
+        return {}
 
 
-# ── stage 5: upload to google photos ──────────────────────────────────────────
-async def upload_to_google_photos(
-    paths: list[Path],
-    album_name: str,
-    access_token: str,
-) -> tuple[Optional[str], Optional[str]]:
+# ── Stage 6: Enhance a single photo ───────────────────────────────────────────
+async def enhance_photo(path: Path, enhance_notes: str) -> tuple[Path, str]:
+    """
+    Apply targeted corrections based on enhance_notes.
+    Returns (enhanced_path, description).
+    """
+    try:
+        from PIL import Image, ImageEnhance, ImageFilter
+        import numpy as np
+
+        img = Image.open(path).convert("RGB")
+        notes = (enhance_notes or "").lower()
+        applied = []
+
+        # Exposure
+        if any(w in notes for w in ["underexposed", "dark", "too dark", "dim"]):
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(1.25)
+            applied.append("brightened exposure")
+        elif any(w in notes for w in ["overexposed", "bright", "washed out", "blown"]):
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(0.82)
+            applied.append("reduced exposure")
+
+        # Contrast
+        if any(w in notes for w in ["contrast", "flat", "hazy", "foggy"]):
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(1.2)
+            applied.append("boosted contrast")
+
+        # Sharpness
+        if any(w in notes for w in ["soft", "slightly soft", "blur", "unsharp"]):
+            enhancer = ImageEnhance.Sharpness(img)
+            img = enhancer.enhance(1.4)
+            applied.append("sharpened")
+
+        # Color warmth
+        if any(w in notes for w in ["cool", "cold", "blue cast", "warm", "color cast"]):
+            r, g, b = img.split()
+            if "cool" in notes or "cold" in notes or "blue" in notes:
+                r = r.point(lambda x: min(255, int(x * 1.08)))
+                b = b.point(lambda x: int(x * 0.94))
+                applied.append("warmed skin tones")
+            else:
+                r = r.point(lambda x: int(x * 0.95))
+                b = b.point(lambda x: min(255, int(x * 1.06)))
+                applied.append("cooled color balance")
+            img = Image.merge("RGB", (r, g, b))
+
+        # Saturation boost (almost always helps)
+        enhancer = ImageEnhance.Color(img)
+        img = enhancer.enhance(1.1)
+        if "saturation" not in " ".join(applied):
+            applied.append("enhanced colors")
+
+        # Save enhanced version
+        enhanced_path = path.parent / f"{path.stem}_enhanced{path.suffix}"
+        img.save(enhanced_path, quality=92)
+
+        desc = " · ".join(applied) if applied else "Auto-enhanced"
+        return enhanced_path, desc.capitalize()
+
+    except Exception as e:
+        return path, "Enhancement failed"
+
+
+# ── Stage 7: Upload to Google Photos ──────────────────────────────────────────
+async def upload_to_google_photos(paths, album_name, access_token):
     if not access_token:
         return None, None
-
     headers = {"Authorization": f"Bearer {access_token}", "Content-type": "application/json"}
-
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(
             "https://photoslibrary.googleapis.com/v1/albums",
@@ -305,7 +362,6 @@ async def upload_to_google_photos(
         album = r.json()
         album_id = album.get("id")
         album_url = album.get("productUrl")
-
         if not album_id:
             return None, None
 
@@ -333,86 +389,216 @@ async def upload_to_google_photos(
                 headers=headers,
                 json={"albumId": album_id, "newMediaItems": media_item_tokens},
             )
-
     return album_url, album_id
 
 
-# ── main pipeline ──────────────────────────────────────────────────────────────
-async def run_pipeline(
-    job_id: str,
-    start_date: date,
-    end_date: date,
-    album_name: str,
-    access_token: str,
-    created_album_ids: set = None,
-):
+# ── Main pipeline ──────────────────────────────────────────────────────────────
+async def run_pipeline(job_id, start_date, end_date, album_name, access_token, created_album_ids=None):
     work_dir = WORK_DIR / job_id
     try:
         work_dir.mkdir(parents=True, exist_ok=True)
+        thumbs_dir = work_dir / "thumbs"
+        thumbs_dir.mkdir(exist_ok=True)
 
-        # 1. Fetch photo list from Google Photos
+        # 1. Fetch
         update_job(job_id, status="running", stage="Fetching photo list from Google Photos", progress=5)
         items = await fetch_media_items(access_token, start_date, end_date, job_id)
         total_found = len(items)
-
         if total_found == 0:
             update_job(job_id, status="error", error=f"No photos found between {start_date} and {end_date}")
             return
-
         update_job(job_id, total=total_found, stage=f"Found {total_found} photos — downloading", progress=10)
 
-        # 2. Download all photos
-        image_paths = await download_all_photos(items, work_dir, access_token, job_id)
-
-        if not image_paths:
+        # 2. Download
+        path_item_pairs = await download_all_photos(items, work_dir, access_token, job_id)
+        if not path_item_pairs:
             update_job(job_id, status="error", error="Failed to download any photos")
             return
 
-        # 3. Cheap signals pass
-        update_job(job_id, stage=f"Analyzing {len(image_paths)} photos", progress=36)
+        # 3. Cheap filters
+        update_job(job_id, stage=f"Analyzing {len(path_item_pairs)} photos", progress=32)
         images = []
-        for i, path in enumerate(image_paths):
+        for i, (path, item) in enumerate(path_item_pairs):
             if is_screenshot(path):
                 continue
+            ct = item.get("mediaMetadata", {}).get("creationTime", "")
+            day = ct[:10] if ct else str(start_date)
             images.append({
                 "path": path,
                 "blur": blur_score(path),
                 "exposure": exposure_score(path),
                 "hash": perceptual_hash(path),
                 "dt": get_exif_datetime(path),
-                "claude_score": None,
+                "day": day,
+                "item_id": item.get("id", ""),
+                "filename": path.name,
+                "claude_result": None,
             })
             if i % 50 == 0:
-                pct = 36 + int((i / len(image_paths)) * 14)
-                update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{len(image_paths)})")
+                pct = 32 + int((i / len(path_item_pairs)) * 12)
+                update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{len(path_item_pairs)})")
 
         images = [img for img in images if img["blur"] > config.MIN_BLUR_SCORE and img["exposure"] > config.MIN_EXPOSURE_SCORE]
 
-        # 4. Cluster duplicates
-        update_job(job_id, stage="Clustering duplicates", progress=52)
+        # 4. Cluster
+        update_job(job_id, stage="Clustering duplicates", progress=46)
         clusters = cluster_duplicates(images)
-        candidates = [pick_best_cheap(c) for c in clusters]
 
-        # 5. Claude scoring
-        target_count = max(10, int(total_found * TARGET_KEEP_RATIO))
-        update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=58)
+        # Sort each cluster by cheap score, best first
+        for cluster in clusters:
+            for img in cluster:
+                img["cheap_score"] = img["blur"] * 0.6 + img["exposure"] * 0.4
+            cluster.sort(key=lambda x: x["cheap_score"], reverse=True)
+
+        # 5. Claude Vision scoring -- score ALL candidates (first in each cluster)
+        candidates = [c[0] for c in clusters]
+        update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=50)
 
         scored = []
         for i, img in enumerate(candidates):
-            img["claude_score"] = await score_with_claude(img["path"])
+            result = await score_with_claude(img["path"])
+            img["claude_result"] = result
+            img["score"] = result.get("score", 5.0)
+            img["flattering"] = result.get("flattering", True)
+            img["scene"] = result.get("scene", "")
+            img["enhance_notes"] = result.get("enhance_notes")
+            img["unflattering_reason"] = result.get("unflattering_reason")
+            # Find index in original clusters list
+            img["cluster_idx"] = i
+            img["cluster_size"] = len(clusters[i])
             scored.append(img)
             if i % 10 == 0:
-                pct = 58 + int((i / len(candidates)) * 28)
+                pct = 50 + int((i / len(candidates)) * 28)
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
-        # 6. Select keepers
-        scored.sort(key=lambda x: x["claude_score"], reverse=True)
-        keepers = scored[:target_count]
-        keeper_paths = [img["path"] for img in keepers]
+        # 6. Filter unflattering, select keepers
+        flattering = [img for img in scored if img["flattering"]]
+        flattering.sort(key=lambda x: x["score"], reverse=True)
+        target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
+        keepers = flattering[:target_count]
 
-        # 7. Upload
-        update_job(job_id, kept=len(keeper_paths), stage="Creating Google Photos album", progress=88)
+        # Generate thumbnails for preview
+        update_job(job_id, stage="Generating preview thumbnails", progress=80)
+        for img in keepers:
+            try:
+                from PIL import Image
+                thumb = Image.open(img["path"]).convert("RGB")
+                thumb.thumbnail((400, 400))
+                thumb_path = thumbs_dir / img["filename"]
+                thumb.save(thumb_path, "JPEG", quality=80)
+                img["thumb"] = img["filename"]
+            except Exception:
+                img["thumb"] = None
+
+        # 7. Trip narrative naming
+        update_job(job_id, stage="Writing trip narrative", progress=84)
+
+        # Group keepers by day
+        days_map = {}
+        for img in keepers:
+            d = img["day"]
+            if d not in days_map:
+                days_map[d] = []
+            days_map[d].append(img)
+
+        # Build days summary for narrative
+        days_summary = []
+        for d in sorted(days_map.keys()):
+            scenes = list(set(img["scene"] for img in days_map[d] if img.get("scene")))
+            days_summary.append({
+                "date": d,
+                "photo_count": len(days_map[d]),
+                "scenes": ", ".join(scenes[:5]),
+                "locations": None,  # could add GPS reverse geocode here
+            })
+
+        day_names = await generate_trip_narrative(days_summary, album_name)
+
+        # 8. Build preview payload
+        preview_days = []
+        for d in sorted(days_map.keys()):
+            day_photos = []
+            for img in days_map[d]:
+                day_photos.append({
+                    "id": img["filename"],
+                    "filename": img["filename"],
+                    "score": round(img["score"], 1),
+                    "scene": img.get("scene", ""),
+                    "enhance_notes": img.get("enhance_notes"),
+                    "has_alternatives": img["cluster_size"] > 1,
+                    "enhanced": False,
+                    "removed": False,
+                    "cluster_idx": img["cluster_idx"],
+                })
+            preview_days.append({
+                "date": d,
+                "day_name": day_names.get(d, d),
+                "photos_found": len([img for img in scored if img["day"] == d]),
+                "photos": day_photos,
+            })
+
+        # Store full preview state in job
+        # Keep all scored candidates for swap operations
+        all_candidates_serializable = []
+        for i, cluster in enumerate(clusters):
+            cluster_entries = []
+            for img in cluster:
+                cluster_entries.append({
+                    "filename": img["filename"],
+                    "day": img["day"],
+                    "score": img.get("score", img.get("cheap_score", 0)),
+                    "flattering": img.get("flattering", True),
+                    "scene": img.get("scene", ""),
+                    "enhance_notes": img.get("enhance_notes"),
+                })
+            all_candidates_serializable.append(cluster_entries)
+
+        update_job(
+            job_id,
+            status="preview_ready",
+            stage="Preview ready",
+            progress=90,
+            kept=len(keepers),
+            preview={
+                "album_name": album_name,
+                "total_found": total_found,
+                "days": preview_days,
+            },
+            all_clusters=all_candidates_serializable,
+            work_dir=str(work_dir),
+        )
+
+    except Exception as e:
+        update_job(job_id, status="error", error=str(e))
+        work_dir_path = WORK_DIR / job_id
+        if work_dir_path.exists():
+            shutil.rmtree(work_dir_path)
+
+
+async def confirm_and_upload(job_id, access_token, created_album_ids=None):
+    """Upload the approved photo set to Google Photos."""
+    try:
+        job = job_store[job_id]
+        work_dir = Path(job["work_dir"])
+        preview = job["preview"]
+        album_name = preview["album_name"]
+
+        update_job(job_id, status="uploading", stage="Creating Google Photos album", progress=92)
+
+        # Collect approved, non-removed photos
+        keeper_paths = []
+        for day in preview["days"]:
+            for photo in day["photos"]:
+                if not photo.get("removed"):
+                    # Use enhanced version if available
+                    filename = photo["filename"]
+                    enhanced = filename.replace(".", "_enhanced.", 1) if photo.get("enhanced") else None
+                    path = work_dir / (enhanced if enhanced and (work_dir / enhanced).exists() else filename)
+                    if path.exists():
+                        keeper_paths.append(path)
+
         album_url, album_id = await upload_to_google_photos(keeper_paths, album_name, access_token)
+
         if album_id and created_album_ids is not None:
             created_album_ids.add(album_id)
 
@@ -425,8 +611,9 @@ async def run_pipeline(
             album_url=album_url or "no_google_token",
         )
 
-    except Exception as e:
-        update_job(job_id, status="error", error=str(e))
-    finally:
+        # Cleanup
         if work_dir.exists():
             shutil.rmtree(work_dir)
+
+    except Exception as e:
+        update_job(job_id, status="error", error=str(e))
