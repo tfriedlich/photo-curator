@@ -220,42 +220,45 @@ Return exactly this structure:
   "enhance_notes": <null or brief correction notes>
 }
 
-SCORING RULES for a family vacation album:
+AUTOMATIC SCORE 1-2 (these should NEVER appear in a family album):
+- QR codes, barcodes, tickets, receipts, documents, screenshots
+- View out of airplane window with no people visible
+- Photos where ALL subjects have backs to camera or heads down/looking away
+- Completely dark or completely blown-out photos
+- Accidental shots, floor, ceiling, random objects
+- Anyone mid-blink, mid-chew, or making an unintentionally bad face
 
-Score 1-2 (EXCLUDE -- not album-worthy):
-- QR codes, barcodes, tickets
-- Receipts, credit card statements, financial documents
-- Screenshots of apps, maps, messages
-- Photos of signs, menus, placards, documents
-- Completely empty landscapes with zero people (unless truly breathtaking)
-- Accidental shots, floor/ceiling/blur
-- Anyone mid-blink, mid-chew, or looking terrible
+SCORE 3-4 (weak -- exclude unless nothing better exists):
+- Airplane cabin shots that are dark, cramped, or unflattering
+- People looking away, distracted, not engaged with camera
+- Backs of heads even if scenic background
+- Empty landscapes with no family members
+- Food/drink photos without people in frame
+- Hotel rooms, airports, generic travel infrastructure with no people
 
-Score 3-4 (WEAK -- only include if nothing better):
-- Technically ok but nobody looks good
-- Overly staged or awkward poses
-- Landscapes without family members
-- Food photos without people
-- Random objects (luggage, gear, hotel rooms with no people)
-- Backs of heads, people walking away
+SCORE 5-6 (acceptable -- include only to fill gaps):
+- Decent moments but someone looks slightly off
+- OK airplane/travel shots where people look reasonably good
+- Scenic shots with at least one family member present
 
-Score 5-6 (ACCEPTABLE):
-- Decent family moments, minor issues
-- OK expressions, acceptable composition
-- Scenic shots with at least one family member
+SCORE 7-8 (good -- include these):
+- Everyone in frame looks good, genuine moment captured
+- Natural smiles, engaged expressions, good lighting
+- Activity shots showing family having fun
+- Scenic shots where family is prominently featured
 
-Score 7-8 (GOOD):
-- Everyone looks nice, genuine moment
-- Good composition and lighting
-- Activity photos where family is clearly having fun
-
-Score 9-10 (EXCELLENT -- must include):
-- Perfect family moment, everyone looks great
-- Genuine joy, laughter, connection
-- Beautiful setting WITH family in it
+SCORE 9-10 (excellent -- must include):
+- Perfect family moment, everyone looks their best
+- Genuine joy, laughter, connection visible
+- Great composition AND people look great
 - Will be treasured for years
 
-FLATTERING check: Are ALL visible people looking good? Eyes open, good expression, not caught awkwardly, lighting kind to faces. If anyone looks bad, flattering=false."""
+CRITICAL FLATTERING CHECK:
+- If ANY person has their back to camera: flattering=false
+- If ANY person is looking down or away: flattering=false  
+- If ANY person has eyes closed or bad expression: flattering=false
+- If lighting makes anyone look bad: flattering=false
+- Only flattering=true if ALL visible people look good"""
 
         payload = {
             "model": "claude-sonnet-4-20250514",
