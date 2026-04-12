@@ -124,6 +124,29 @@ async def auth_disconnect():
     token_store["refresh_token"] = ""
     return {"ok": True}
 
+@app.get("/auth/diagnose")
+async def diagnose_token():
+    """Test the current token against Google APIs and show what scopes it has."""
+    token = await get_valid_token()
+    if not token:
+        return {"error": "No token available"}
+    
+    results = {}
+    async with httpx.AsyncClient(timeout=10) as client:
+        # Check token info
+        r = await client.get(f"https://oauth2.googleapis.com/tokeninfo?access_token={token}")
+        results["token_info"] = r.json()
+        
+        # Try Photos API
+        r2 = await client.get(
+            "https://photoslibrary.googleapis.com/v1/albums?pageSize=1",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        results["photos_api_status"] = r2.status_code
+        results["photos_api_response"] = r2.json()
+    
+    return results
+
 @app.get("/auth/refresh-token")
 async def get_refresh_token():
     """One-time endpoint to retrieve refresh token for Railway env setup."""
