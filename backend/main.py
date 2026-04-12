@@ -125,6 +125,14 @@ async def auth_disconnect():
     token_store["refresh_token"] = ""
     return {"ok": True}
 
+@app.get("/auth/refresh-token")
+async def get_refresh_token():
+    """One-time endpoint to retrieve refresh token for Railway env setup."""
+    rt = token_store.get("refresh_token", "")
+    if not rt:
+        return {"error": "No refresh token in memory. Please reconnect Google Photos first."}
+    return {"refresh_token": rt, "instructions": "Add this as GOOGLE_REFRESH_TOKEN in Railway variables, then you can delete this endpoint."}
+
 
 # ── Events ─────────────────────────────────────────────────────────────────────
 @app.get("/api/events")
