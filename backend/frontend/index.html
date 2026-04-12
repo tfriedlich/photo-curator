@@ -400,6 +400,7 @@
   function continueTrip() {
     // Already set up -- just hide banner context, user picks photos
     showToast(`Adding to "${tripState.albumName}"`);
+    document.getElementById('confirm-btn-label').textContent = `Add to "${tripState.albumName}" →`;;
   }
 
   function confirmNewTrip() {
@@ -628,7 +629,10 @@
     const preview = previewState;
     document.getElementById('preview-title').textContent = preview.album_name;
     const totalKept = countKept();
-    document.getElementById('preview-meta').textContent = `${preview.total_found} photos found · ${totalKept} selected`;
+    const albumContext = tripState
+      ? `Adding to "${tripState.albumName}" · Day ${tripState.daysAdded + 1}`
+      : 'New album';
+    document.getElementById('preview-meta').textContent = `${preview.total_found} photos found · ${totalKept} selected · ${albumContext}`;
     document.getElementById('ratio-count').textContent = `${totalKept} photos`;
     updateConfirmSummary();
     const container = document.getElementById('preview-days');
@@ -737,7 +741,7 @@
   async function confirmAlbum() {
     const btn = document.getElementById('confirm-btn');
     btn.disabled = true;
-    document.getElementById('confirm-btn-label').textContent = 'Adding...';
+    document.getElementById('confirm-btn-label').textContent = tripState ? `Adding to "${tripState.albumName}"...` : 'Creating album...';
 
     // Use existing album if trip in progress
     const existingAlbumId = tripState?.albumId || '';
@@ -804,7 +808,10 @@
     document.getElementById('stat-total').textContent = '—';
     document.getElementById('stat-kept').textContent = '—';
     document.getElementById('confirm-btn').disabled = false;
-    document.getElementById('confirm-btn-label').textContent = tripState ? 'Add to Album →' : 'Create Album →';
+    const btnLabel = tripState
+      ? `Add to "${tripState.albumName}" →`
+      : 'Create New Album →';
+    document.getElementById('confirm-btn-label').textContent = btnLabel;
     showSection('none');
     clearInterval(pollInterval);
     clearInterval(pickerPollInterval);

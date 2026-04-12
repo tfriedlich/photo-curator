@@ -514,9 +514,15 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
         # 6. Filter unflattering, select keepers
-        flattering = [img for img in scored if img["flattering"] and img.get("score", 5.0) >= 4.0]
+        flattering = [img for img in scored if img["flattering"] and img.get("score", 5.0) >= config.MIN_SCORE]
         flattering.sort(key=lambda x: x["score"], reverse=True)
-        target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
+        # For small sessions apply stricter ratio; always respect MIN_SCORE cutoff
+        session_ratio = config.TARGET_KEEP_RATIO
+        if total_found < 100:
+            session_ratio = min(config.TARGET_KEEP_RATIO, 0.30)
+        if total_found < 50:
+            session_ratio = min(config.TARGET_KEEP_RATIO, 0.25)
+        target_count = max(5, int(total_found * session_ratio))
         keepers = flattering[:target_count]
 
         # Generate thumbnails for preview
