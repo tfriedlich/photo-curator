@@ -468,10 +468,12 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
         # Score top 2 candidates per cluster (best cheap scores)
         # This prevents good photos being discarded because cluster[0] happened to score poorly
         candidates = []
+        seen_paths = set()
         for c in clusters:
-            candidates.append(c[0])
-            if len(c) > 1:
-                candidates.append(c[1])
+            for member in c[:2]:  # safe -- slicing never raises IndexError
+                if member["path"] not in seen_paths:
+                    candidates.append(member)
+                    seen_paths.add(member["path"])
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=42)
         scored = []
         for i, img in enumerate(candidates):
@@ -698,10 +700,12 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
         # Score top 2 candidates per cluster (best cheap scores)
         # This prevents good photos being discarded because cluster[0] happened to score poorly
         candidates = []
+        seen_paths = set()
         for c in clusters:
-            candidates.append(c[0])
-            if len(c) > 1:
-                candidates.append(c[1])
+            for member in c[:2]:  # safe -- slicing never raises IndexError
+                if member["path"] not in seen_paths:
+                    candidates.append(member)
+                    seen_paths.add(member["path"])
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=50)
         scored = []
         for i, img in enumerate(candidates):
