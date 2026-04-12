@@ -19,7 +19,10 @@ app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
-GOOGLE_SCOPES = "https://www.googleapis.com/auth/photoslibrary.appendonly"
+GOOGLE_SCOPES = " ".join([
+    "https://www.googleapis.com/auth/photoslibrary.appendonly",
+    "https://www.googleapis.com/auth/photospicker.mediaitems.readonly",
+])
 
 UPLOAD_DIR = Path("/tmp/photo-curator/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -305,6 +308,81 @@ async def confirm_album(job_id: str, background_tasks: BackgroundTasks):
     return {"ok": True}
 
 
+# ── Google Photos Picker API ───────────────────────────────────────────────────
+@app.post("/api/picker/session")
+async def create_picker_session():
+    """Create a new Picker API session and return the pickerUri."""
+    access_token = await get_valid_token()
+    if not access_token:
+        raise HTTPException(401, "Not connected")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            "https://photospicker.googleapis.com/v1/sessions",
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            json={},
+        )
+        data = r.json()
+
+    if "error" in data:
+        raise HTTPException(400, data["error"].get("message", "Failed to create picker session"))
+
+    return {
+        "session_id": data.get("id"),
+        "picker_uri": data.get("pickerUri"),
+        "expires_at": data.get("expireTime"),
+    }
+
+
+@app.get("/api/picker/session/{session_id}")
+async def poll_picker_session(session_id: str):
+    """Poll a picker session to check if user has finished selecting."""
+    access_token = await get_valid_token()
+    if not access_token:
+        raise HTTPException(401, "Not connected")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"https://photospicker.googleapis.com/v1/sessions/{session_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        data = r.json()
+
+    if "error" in data:
+        raise HTTPException(400, data["error"].get("message", "Session error"))
+
+    return {
+        "media_items_set": data.get("mediaItemsSet", False),
+        "poll_interval": data.get("pollingConfig", {}).get("pollInterval", "10s"),
+        "expires_at": data.get("expireTime"),
+    }
+
+
+@app.post("/api/picker/curate")
+async def curate_from_picker(
+    background_tasks: BackgroundTasks,
+    session_id: str,
+    album_name: str = "Best Of Trip",
+):
+    """Start curation pipeline using photos selected via Picker API."""
+    access_token = await get_valid_token()
+    if not access_token:
+        raise HTTPException(401, "Not connected")
+
+    job_id = str(uuid.uuid4())
+    job_store[job_id] = {
+        "status": "queued", "stage": "Starting", "progress": 0,
+        "total": 0, "kept": 0, "album_url": None, "error": None,
+        "album_name": album_name,
+    }
+
+    background_tasks.add_task(
+        run_pipeline_from_picker,
+        job_id, session_id, album_name, access_token
+    )
+    return {"job_id": job_id}
+
+
 @app.get("/api/health")
 async def health():
     return {"ok": True}
@@ -467,3 +545,213 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
         if work_dir.exists(): shutil.rmtree(work_dir)
     finally:
         if zip_path.exists(): zip_path.unlink()
+
+
+# ── Picker pipeline ────────────────────────────────────────────────────────────
+async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str, access_token: str):
+    """Fetch photos from Picker session and run the curation pipeline."""
+    import asyncio
+    from pipeline import (
+        is_screenshot, blur_score, exposure_score, perceptual_hash,
+        get_exif_datetime, cluster_duplicates, score_with_claude,
+        generate_trip_narrative, upload_to_google_photos,
+        update_job, WORK_DIR
+    )
+    import shutil
+
+    work_dir = WORK_DIR / job_id
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+        thumbs_dir = work_dir / "thumbs"
+        thumbs_dir.mkdir(exist_ok=True)
+
+        # 1. Fetch media items from picker session
+        update_job(job_id, status="running", stage="Fetching selected photos", progress=5)
+        headers = {"Authorization": f"Bearer {access_token}"}
+        items = []
+        next_page_token = None
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            while True:
+                params = {"sessionId": session_id, "pageSize": 100}
+                if next_page_token:
+                    params["pageToken"] = next_page_token
+                r = await client.get(
+                    "https://photospicker.googleapis.com/v1/mediaItems",
+                    headers=headers,
+                    params=params,
+                )
+                data = r.json()
+                if "error" in data:
+                    raise Exception(f"Picker API error: {data['error'].get('message', str(data['error']))}")
+                batch = data.get("mediaItems", [])
+                items.extend(batch)
+                update_job(job_id, stage=f"Fetching photos ({len(items)} found)", progress=8)
+                next_page_token = data.get("nextPageToken")
+                if not next_page_token:
+                    break
+                await asyncio.sleep(0.1)
+
+        # Filter videos, keep only photos
+        items = [i for i in items if i.get("type") == "PHOTO" or
+                 (i.get("mediaFile", {}).get("mimeType", "").startswith("image/"))]
+
+        total_found = len(items)
+        update_job(job_id, total=total_found, stage=f"Found {total_found} photos — downloading", progress=10)
+
+        if total_found == 0:
+            update_job(job_id, status="error", error="No photos found in selection")
+            return
+
+        # 2. Download photos
+        semaphore = asyncio.Semaphore(8)
+
+        async def download_one(item, idx):
+            async with semaphore:
+                try:
+                    # Picker API uses mediaFile.baseUrl
+                    base_url = item.get("mediaFile", {}).get("baseUrl") or item.get("baseUrl", "")
+                    if not base_url:
+                        return None
+                    # Append =d for full download
+                    url = base_url + "=d"
+                    filename = item.get("mediaFile", {}).get("filename") or f"photo_{idx}.jpg"
+                    dest = work_dir / filename
+                    if dest.exists():
+                        dest = work_dir / f"{dest.stem}_{idx}{dest.suffix}"
+
+                    async with httpx.AsyncClient(timeout=60) as client:
+                        r = await client.get(url, headers={"Authorization": f"Bearer {access_token}"})
+                        if r.status_code == 200:
+                            dest.write_bytes(r.content)
+                            if idx % 25 == 0:
+                                pct = 10 + int((idx / total_found) * 22)
+                                update_job(job_id, stage=f"Downloading photos ({idx}/{total_found})", progress=pct)
+                            return dest
+                except Exception:
+                    pass
+                return None
+
+        tasks = [download_one(item, i) for i, item in enumerate(items)]
+        results = await asyncio.gather(*tasks)
+        image_paths = [p for p in results if p is not None]
+
+        if not image_paths:
+            update_job(job_id, status="error", error="Failed to download any photos")
+            return
+
+        # 3. Cheap filters
+        update_job(job_id, stage=f"Analyzing {len(image_paths)} photos", progress=34)
+        images = []
+        for i, path in enumerate(image_paths):
+            if is_screenshot(path): continue
+            ct = get_exif_datetime(path)
+            day = ct.strftime("%Y-%m-%d") if ct else "unknown"
+            images.append({
+                "path": path, "blur": blur_score(path), "exposure": exposure_score(path),
+                "hash": perceptual_hash(path), "dt": ct, "day": day,
+                "filename": path.name, "item_id": path.stem, "claude_result": None,
+            })
+            if i % 50 == 0:
+                pct = 34 + int((i / len(image_paths)) * 10)
+                update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{len(image_paths)})")
+
+        images = [img for img in images
+                  if img["blur"] > config.MIN_BLUR_SCORE and img["exposure"] > config.MIN_EXPOSURE_SCORE]
+
+        # 4. Cluster
+        update_job(job_id, stage="Clustering duplicates", progress=46)
+        clusters = cluster_duplicates(images)
+        for cluster in clusters:
+            for img in cluster:
+                img["cheap_score"] = img["blur"] * 0.6 + img["exposure"] * 0.4
+            cluster.sort(key=lambda x: x["cheap_score"], reverse=True)
+
+        # 5. Claude scoring
+        candidates = [c[0] for c in clusters]
+        update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=50)
+        scored = []
+        for i, img in enumerate(candidates):
+            result = await score_with_claude(img["path"])
+            img["claude_result"] = result
+            img["score"] = result.get("score", 5.0)
+            img["flattering"] = result.get("flattering", True)
+            img["scene"] = result.get("scene", "")
+            img["enhance_notes"] = result.get("enhance_notes")
+            img["cluster_idx"] = i
+            img["cluster_size"] = len(clusters[i])
+            scored.append(img)
+            if i % 10 == 0:
+                pct = 50 + int((i / len(candidates)) * 26)
+                update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
+
+        # 6. Select keepers
+        flattering = [img for img in scored if img["flattering"]]
+        flattering.sort(key=lambda x: x["score"], reverse=True)
+        target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
+        keepers = flattering[:target_count]
+
+        # 7. Thumbnails
+        update_job(job_id, stage="Generating preview thumbnails", progress=78)
+        for img in keepers:
+            try:
+                from PIL import Image
+                thumb = Image.open(img["path"]).convert("RGB")
+                thumb.thumbnail((400, 400))
+                thumb_path = thumbs_dir / img["filename"]
+                thumb.save(thumb_path, "JPEG", quality=80)
+                img["thumb"] = img["filename"]
+            except Exception:
+                img["thumb"] = None
+
+        # 8. Trip narrative
+        update_job(job_id, stage="Writing trip narrative", progress=82)
+        days_map = {}
+        for img in keepers:
+            d = img["day"]
+            if d not in days_map: days_map[d] = []
+            days_map[d].append(img)
+
+        days_summary = [{"date": d, "photo_count": len(days_map[d]),
+                          "scenes": ", ".join(list(set(img["scene"] for img in days_map[d] if img.get("scene")))[:5]),
+                          "locations": None}
+                         for d in sorted(days_map.keys())]
+        day_names = await generate_trip_narrative(days_summary, album_name)
+
+        # 9. Build preview
+        preview_days = []
+        for d in sorted(days_map.keys()):
+            day_photos = [{"id": img["filename"], "filename": img["filename"],
+                           "score": round(img["score"], 1), "scene": img.get("scene", ""),
+                           "enhance_notes": img.get("enhance_notes"), "has_alternatives": img["cluster_size"] > 1,
+                           "enhanced": False, "removed": False, "cluster_idx": img["cluster_idx"]}
+                          for img in days_map[d]]
+            preview_days.append({"date": d, "day_name": day_names.get(d, d),
+                                  "photos_found": len([img for img in scored if img["day"] == d]),
+                                  "photos": day_photos})
+
+        all_clusters_serializable = [[{"filename": img["filename"], "day": img["day"],
+                                        "score": img.get("score", img.get("cheap_score", 0)),
+                                        "flattering": img.get("flattering", True),
+                                        "scene": img.get("scene", ""), "enhance_notes": img.get("enhance_notes")}
+                                       for img in cluster] for cluster in clusters]
+
+        # Delete picker session
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.delete(
+                    f"https://photospicker.googleapis.com/v1/sessions/{session_id}",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+        except Exception:
+            pass
+
+        update_job(job_id, status="preview_ready", stage="Preview ready", progress=90,
+                   kept=len(keepers),
+                   preview={"album_name": album_name, "total_found": total_found, "days": preview_days},
+                   all_clusters=all_clusters_serializable, work_dir=str(work_dir))
+
+    except Exception as e:
+        update_job(job_id, status="error", error=str(e))
+        if work_dir.exists():
+            shutil.rmtree(work_dir)

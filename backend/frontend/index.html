@@ -11,7 +11,7 @@
     :root {
       --ink: #1a1612; --paper: #f5f0e8; --cream: #ede8de; --amber: #c8883a;
       --amber-pale: #fdf4e3; --red: #c94040; --muted: #8a7f72; --green: #3a7a5a;
-      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12);
+      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12); --blue: #2563eb;
     }
     html, body { min-height: 100%; background: var(--paper); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 300; }
     body { display: flex; flex-direction: column; align-items: center; padding: 48px 24px 80px; }
@@ -41,6 +41,37 @@
     .btn-connect.connect:hover { background: #b8782a; }
     .btn-connect.disconnect { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
 
+    /* Method tabs */
+    .method-tabs { display: flex; gap: 0; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+    .method-tab { flex: 1; padding: 11px 16px; background: var(--paper); border: none; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: background 0.15s; color: var(--muted); border-right: 1px solid var(--border); }
+    .method-tab:last-child { border-right: none; }
+    .method-tab.active { background: white; color: var(--ink); font-weight: 500; }
+    .method-tab:hover:not(.active) { background: var(--cream); }
+
+    /* Picker section */
+    #picker-section { display: none; }
+    #picker-section.show { display: block; }
+    .picker-btn { width: 100%; padding: 18px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'Playfair Display', serif; font-size: 18px; cursor: pointer; transition: background 0.2s; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .picker-btn:hover:not(:disabled) { background: #b8782a; }
+    .picker-btn:disabled { background: var(--muted); cursor: not-allowed; }
+    .picker-note { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; text-align: center; line-height: 1.6; margin-bottom: 16px; }
+
+    /* Picker waiting state */
+    #picker-waiting { display: none; padding: 20px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 3px; margin-bottom: 16px; text-align: center; }
+    #picker-waiting.show { display: block; }
+    .picker-waiting-icon { font-size: 28px; margin-bottom: 8px; }
+    .picker-waiting-title { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+    .picker-waiting-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .btn-picker-open { display: inline-block; margin-top: 12px; padding: 10px 20px; background: var(--blue); color: white; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 500; }
+
+    /* ZIP section */
+    #zip-section { display: none; }
+    #zip-section.show { display: block; }
+    .how-to { background: var(--cream); border: 1px solid var(--border); border-radius: 3px; padding: 14px 16px; margin-bottom: 20px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+    .how-to strong { color: var(--ink); font-weight: 500; }
+    .how-to a { color: var(--amber); text-decoration: none; }
+    .how-to a:hover { text-decoration: underline; }
+
     /* Inputs */
     input[type="text"] { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); outline: none; transition: border-color 0.2s; }
     input[type="text"]:focus { border-color: var(--amber); }
@@ -60,12 +91,6 @@
     .btn-submit { width: 100%; margin-top: 20px; padding: 14px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
     .btn-submit:hover:not(:disabled) { background: #b8782a; }
     .btn-submit:disabled { background: var(--muted); cursor: not-allowed; }
-
-    /* How-to note */
-    .how-to { background: var(--cream); border: 1px solid var(--border); border-radius: 3px; padding: 14px 16px; margin-bottom: 24px; font-size: 12px; color: var(--muted); line-height: 1.7; }
-    .how-to strong { color: var(--ink); font-weight: 500; }
-    .how-to a { color: var(--amber); text-decoration: none; }
-    .how-to a:hover { text-decoration: underline; }
 
     /* Progress */
     #progress-panel { display: none; padding: 24px 36px 32px; }
@@ -96,8 +121,7 @@
     .day-date { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; }
     .day-count { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-left: auto; }
     .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-
-    .photo-card { position: relative; border-radius: 3px; overflow: hidden; border: 2px solid transparent; transition: border-color 0.15s; background: var(--cream); }
+    .photo-card { position: relative; border-radius: 3px; overflow: hidden; border: 2px solid transparent; background: var(--cream); }
     .photo-card:hover .photo-actions { opacity: 1; }
     .photo-card.removed { opacity: 0.25; border-color: var(--red); }
     .photo-card.removed .photo-actions { opacity: 1; }
@@ -107,7 +131,7 @@
     .photo-badge { position: absolute; top: 4px; right: 4px; font-size: 9px; font-family: 'DM Mono', monospace; padding: 2px 5px; border-radius: 2px; text-transform: uppercase; }
     .photo-badge.enhanced { background: var(--green); color: white; }
     .photo-actions { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(26,22,18,0.82); display: flex; gap: 1px; opacity: 0; transition: opacity 0.15s; }
-    .photo-action { flex: 1; padding: 6px 2px; background: none; border: none; color: white; font-size: 11px; cursor: pointer; transition: background 0.1s; text-align: center; font-family: 'DM Sans', sans-serif; }
+    .photo-action { flex: 1; padding: 6px 2px; background: none; border: none; color: white; font-size: 11px; cursor: pointer; text-align: center; font-family: 'DM Sans', sans-serif; }
     .photo-action:hover { background: rgba(255,255,255,0.15); }
     .photo-action.restore { color: #86efac; }
     .photo-action:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -122,14 +146,12 @@
     .btn-back { padding: 12px 16px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; }
     .btn-back:hover { background: var(--cream); }
 
-    /* Uploading */
     #uploading-panel { display: none; padding: 40px 36px; text-align: center; }
     .up-icon { font-size: 36px; margin-bottom: 12px; animation: spin 2s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .up-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 8px; }
     .up-stage { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
 
-    /* Results */
     .result { display: none; padding: 28px 36px 36px; text-align: center; }
     .result.show { display: block; }
     .result-icon { font-size: 36px; margin-bottom: 12px; }
@@ -160,41 +182,66 @@
         <span class="google-icon">📷</span>
         <div class="google-text">
           <strong id="google-status-text">Google Photos not connected</strong>
-          <span id="google-status-sub">Connect to automatically create your curated album</span>
+          <span id="google-status-sub">Connect to select and curate your trip photos</span>
         </div>
         <button class="btn-connect connect" id="google-btn" onclick="handleGoogleBtn()">Connect</button>
       </div>
 
-      <!-- How to get Takeout ZIP -->
-      <div class="how-to">
-        <strong>How to export your trip photos:</strong><br>
-        1. Go to <a href="https://takeout.google.com" target="_blank">takeout.google.com</a><br>
-        2. Select only <strong>Google Photos</strong> → choose your trip album or date range<br>
-        3. Export as ZIP → download when ready (takes 10–30 min)<br>
-        4. Upload the ZIP below
-      </div>
-
+      <!-- Album name -->
       <div class="field">
         <span class="slabel">Album name</span>
         <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026"/>
       </div>
 
-      <span class="slabel">Google Takeout ZIP</span>
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="file-input" accept=".zip"/>
-        <span class="drop-icon">📦</span>
-        <div class="drop-title">Drop your Takeout ZIP here</div>
-        <div class="drop-sub">or click to browse · .zip files only</div>
-      </div>
-      <div class="file-selected" id="file-selected">
-        <span style="font-size:16px;">🗜</span>
-        <span class="file-name" id="file-name-label">—</span>
-        <span class="file-size" id="file-size-label">—</span>
+      <!-- Method tabs -->
+      <div class="method-tabs">
+        <button class="method-tab active" id="tab-picker" onclick="switchTab('picker')">📷 Select from Google Photos</button>
+        <button class="method-tab" id="tab-zip" onclick="switchTab('zip')">📦 Upload Takeout ZIP</button>
       </div>
 
-      <button class="btn-submit" id="submit-btn" disabled onclick="startUpload()">
-        Curate &amp; Preview Photos
-      </button>
+      <!-- Picker section -->
+      <div id="picker-section" class="show">
+        <div id="picker-waiting">
+          <div class="picker-waiting-icon">🖼</div>
+          <div class="picker-waiting-title">Google Photos picker is open</div>
+          <div class="picker-waiting-sub">Select your trip photos or album, then click Done in Google Photos.<br>This page will automatically continue when you're finished.</div>
+          <a href="#" id="picker-link" target="_blank" class="btn-picker-open">Open Google Photos picker →</a>
+        </div>
+        <button class="picker-btn" id="picker-btn" onclick="startPicker()" disabled>
+          <span>🖼</span> Open Google Photos Picker
+        </button>
+        <div class="picker-note">
+          Opens Google Photos in a new tab · Select your trip photos or album · Returns here automatically
+        </div>
+      </div>
+
+      <!-- ZIP section -->
+      <div id="zip-section">
+        <div class="how-to">
+          <strong>How to export your trip photos:</strong><br>
+          1. Go to <a href="https://takeout.google.com" target="_blank">takeout.google.com</a><br>
+          2. Select only <strong>Google Photos</strong> → choose your trip album<br>
+          3. Export as ZIP → download when ready (10–30 min)<br>
+          4. Upload the ZIP below
+        </div>
+
+        <span class="slabel">Google Takeout ZIP</span>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".zip"/>
+          <span class="drop-icon">📦</span>
+          <div class="drop-title">Drop your Takeout ZIP here</div>
+          <div class="drop-sub">or click to browse · .zip files only</div>
+        </div>
+        <div class="file-selected" id="file-selected">
+          <span style="font-size:16px;">🗜</span>
+          <span class="file-name" id="file-name-label">—</span>
+          <span class="file-size" id="file-size-label">—</span>
+        </div>
+        <button class="btn-submit" id="zip-submit-btn" disabled onclick="startZipUpload()">
+          Curate &amp; Preview Photos
+        </button>
+      </div>
+
     </div>
 
     <div class="divider" id="progress-divider" style="display:none;"></div>
@@ -256,8 +303,8 @@
   </div>
 
   <div class="footer-note">
-    Export via Google Takeout · AI scoring filters unflattering shots · Preview before creating<br>
-    Typical cost: $1–3 per trip · Typical time: 10–20 min for 1,000 photos
+    Select photos via Google Photos Picker or upload a Takeout ZIP<br>
+    AI scores each photo · Filters unflattering shots · Preview before creating album
   </div>
   <div class="toast" id="toast"></div>
 
@@ -265,8 +312,12 @@
   const API = window.location.origin;
   let selectedFile = null;
   let pollInterval = null;
+  let pickerPollInterval = null;
   let currentJobId = null;
   let previewState = null;
+  let currentSessionId = null;
+  let googleConnected = false;
+  let activeTab = 'picker';
 
   window.addEventListener('load', async () => {
     const params = new URLSearchParams(window.location.search);
@@ -279,7 +330,9 @@
   async function checkAuth() {
     try {
       const { connected } = await (await fetch(`${API}/auth/status`)).json();
+      googleConnected = connected;
       updateGoogleBanner(connected);
+      document.getElementById('picker-btn').disabled = !connected;
     } catch(e) { updateGoogleBanner(false); }
   }
 
@@ -291,13 +344,13 @@
     if (connected) {
       banner.className = 'google-banner connected';
       text.textContent = 'Google Photos connected';
-      sub.textContent = 'Curated album will be created automatically';
+      sub.textContent = 'Ready to select and curate your trip photos';
       btn.textContent = 'Disconnect';
       btn.className = 'btn-connect disconnect';
     } else {
       banner.className = 'google-banner disconnected';
       text.textContent = 'Google Photos not connected';
-      sub.textContent = 'Connect to automatically create your curated album';
+      sub.textContent = 'Connect to select photos and create albums automatically';
       btn.textContent = 'Connect';
       btn.className = 'btn-connect connect';
     }
@@ -306,13 +359,83 @@
   function handleGoogleBtn() {
     const btn = document.getElementById('google-btn');
     if (btn.textContent === 'Disconnect') {
-      fetch(`${API}/auth/disconnect`, { method: 'POST' }).then(() => { updateGoogleBanner(false); showToast('Disconnected'); });
+      fetch(`${API}/auth/disconnect`, { method: 'POST' }).then(() => {
+        googleConnected = false;
+        updateGoogleBanner(false);
+        document.getElementById('picker-btn').disabled = true;
+        showToast('Disconnected');
+      });
     } else {
       window.location.href = `${API}/auth/login`;
     }
   }
 
-  // Drag & drop
+  // ── Tab switching ──
+  function switchTab(tab) {
+    activeTab = tab;
+    document.getElementById('tab-picker').classList.toggle('active', tab === 'picker');
+    document.getElementById('tab-zip').classList.toggle('active', tab === 'zip');
+    document.getElementById('picker-section').classList.toggle('show', tab === 'picker');
+    document.getElementById('zip-section').classList.toggle('show', tab === 'zip');
+  }
+
+  // ── Picker flow ──
+  async function startPicker() {
+    if (!googleConnected) { showToast('Connect Google Photos first'); return; }
+    const btn = document.getElementById('picker-btn');
+    btn.disabled = true;
+    btn.textContent = 'Opening picker...';
+
+    try {
+      const r = await fetch(`${API}/api/picker/session`, { method: 'POST' });
+      if (!r.ok) { const err = await r.json(); showToast(err.detail || 'Failed to create session'); btn.disabled = false; btn.innerHTML = '<span>🖼</span> Open Google Photos Picker'; return; }
+      const { session_id, picker_uri } = await r.json();
+      currentSessionId = session_id;
+
+      // Show waiting state and open picker
+      const pickerLink = document.getElementById('picker-link');
+      pickerLink.href = picker_uri + '/autoclose';
+      document.getElementById('picker-waiting').classList.add('show');
+      window.open(picker_uri + '/autoclose', '_blank');
+
+      btn.innerHTML = '<span>🔄</span> Waiting for selection...';
+
+      // Poll for completion
+      pickerPollInterval = setInterval(async () => {
+        try {
+          const pr = await fetch(`${API}/api/picker/session/${session_id}`);
+          const status = await pr.json();
+          if (status.media_items_set) {
+            clearInterval(pickerPollInterval);
+            document.getElementById('picker-waiting').classList.remove('show');
+            btn.innerHTML = '<span>🖼</span> Open Google Photos Picker';
+            btn.disabled = false;
+            startPickerCurate(session_id);
+          }
+        } catch(e) {}
+      }, 3000);
+
+    } catch(err) {
+      showToast('Failed: ' + err.message);
+      btn.disabled = false;
+      btn.innerHTML = '<span>🖼</span> Open Google Photos Picker';
+    }
+  }
+
+  async function startPickerCurate(sessionId) {
+    const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
+    showSection('progress');
+
+    try {
+      const r = await fetch(`${API}/api/picker/curate?session_id=${encodeURIComponent(sessionId)}&album_name=${encodeURIComponent(albumName)}`, { method: 'POST' });
+      if (!r.ok) { const err = await r.json(); showError(err.detail || 'Failed to start'); return; }
+      const { job_id } = await r.json();
+      currentJobId = job_id;
+      pollJob(job_id);
+    } catch(err) { showError(err.message); }
+  }
+
+  // ── ZIP flow ──
   const dz = document.getElementById('dropzone');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
@@ -324,7 +447,7 @@
     document.getElementById('file-name-label').textContent = f.name;
     document.getElementById('file-size-label').textContent = formatBytes(f.size);
     document.getElementById('file-selected').classList.add('show');
-    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('zip-submit-btn').disabled = false;
   }
 
   function formatBytes(b) {
@@ -333,10 +456,10 @@
     return (b/1e3).toFixed(0)+' KB';
   }
 
-  async function startUpload() {
+  async function startZipUpload() {
     if (!selectedFile) return;
     const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
-    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('zip-submit-btn').disabled = true;
     showSection('progress');
 
     const fd = new FormData();
@@ -352,6 +475,7 @@
     } catch(err) { showError(err.message); }
   }
 
+  // ── Shared job polling ──
   function pollJob(jobId) {
     pollInterval = setInterval(async () => {
       try {
@@ -379,6 +503,7 @@
     }, 2000);
   }
 
+  // ── Preview ──
   async function loadPreview(jobId) {
     try {
       const preview = await (await fetch(`${API}/api/preview/${jobId}`)).json();
@@ -433,11 +558,7 @@
 
   function findPhoto(photoId, dayDate) {
     for (const day of previewState.days) {
-      if (day.date === dayDate) {
-        for (const photo of day.photos) {
-          if (photo.id === photoId) return photo;
-        }
-      }
+      if (day.date === dayDate) { for (const photo of day.photos) { if (photo.id === photoId) return photo; } }
     }
     return null;
   }
@@ -470,10 +591,7 @@
       if (!r.ok) { showToast('No alternatives available'); return; }
       const { new_photo } = await r.json();
       const day = previewState.days.find(d => d.date === dayDate);
-      if (day) {
-        const idx = day.photos.findIndex(p => p.id === photoId);
-        if (idx >= 0) { day.photos[idx] = new_photo; const old = document.getElementById(`card-${photoId}`); if (old) old.replaceWith(makePhotoCard(new_photo, dayDate, currentJobId)); }
-      }
+      if (day) { const idx = day.photos.findIndex(p => p.id === photoId); if (idx >= 0) { day.photos[idx] = new_photo; const old = document.getElementById(`card-${photoId}`); if (old) old.replaceWith(makePhotoCard(new_photo, dayDate, currentJobId)); } }
     } catch(e) { showToast('Swap failed'); }
   }
 
@@ -523,17 +641,16 @@
     } catch(e) { showError(e.message); btn.disabled = false; btn.textContent = 'Create Album →'; }
   }
 
-  function backToForm() { showSection('none'); document.getElementById('submit-btn').disabled = false; }
+  function backToForm() { showSection('none'); document.getElementById('zip-submit-btn').disabled = selectedFile ? false : true; document.getElementById('picker-btn').disabled = !googleConnected; }
 
   function showDone(job) {
     const pct = job.total ? Math.round((job.kept/job.total)*100) : '?';
     document.getElementById('result-summary').textContent = `${job.kept} photos in your new album (${pct}% of ${job.total} found). Unflattering shots and duplicates removed.`;
     document.getElementById('album-link').href = job.album_url === 'no_google_token' ? '#' : job.album_url;
-    if (job.album_url === 'no_google_token') document.getElementById('album-link').textContent = 'Connect Google Photos to create album';
     showSection('success');
   }
 
-  function showError(msg) { document.getElementById('error-msg').textContent = msg; showSection('error'); document.getElementById('submit-btn').disabled = false; }
+  function showError(msg) { document.getElementById('error-msg').textContent = msg; showSection('error'); }
 
   function showSection(name) {
     document.getElementById('progress-divider').style.display = 'none';
@@ -543,17 +660,20 @@
     document.getElementById('result-success').classList.remove('show');
     document.getElementById('result-error').classList.remove('show');
     if (name === 'progress') { document.getElementById('progress-divider').style.display='block'; document.getElementById('progress-panel').classList.add('show'); }
-    else if (name === 'preview') { document.getElementById('preview-panel').classList.add('show'); }
-    else if (name === 'uploading') { document.getElementById('uploading-panel').style.display='block'; }
-    else if (name === 'success') { document.getElementById('result-success').classList.add('show'); }
-    else if (name === 'error') { document.getElementById('result-error').classList.add('show'); }
+    else if (name === 'preview') document.getElementById('preview-panel').classList.add('show');
+    else if (name === 'uploading') document.getElementById('uploading-panel').style.display='block';
+    else if (name === 'success') document.getElementById('result-success').classList.add('show');
+    else if (name === 'error') document.getElementById('result-error').classList.add('show');
   }
 
   function reset() {
-    selectedFile = null; previewState = null; currentJobId = null;
+    selectedFile = null; previewState = null; currentJobId = null; currentSessionId = null;
     document.getElementById('file-input').value = '';
     document.getElementById('file-selected').classList.remove('show');
-    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('zip-submit-btn').disabled = true;
+    document.getElementById('picker-btn').disabled = !googleConnected;
+    document.getElementById('picker-btn').innerHTML = '<span>🖼</span> Open Google Photos Picker';
+    document.getElementById('picker-waiting').classList.remove('show');
     document.getElementById('progress-fill').style.width = '0%';
     document.getElementById('stat-total').textContent = '—';
     document.getElementById('stat-kept').textContent = '—';
@@ -561,6 +681,7 @@
     document.getElementById('confirm-btn').textContent = 'Create Album →';
     showSection('none');
     clearInterval(pollInterval);
+    clearInterval(pickerPollInterval);
   }
 
   function formatDate(d) { return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'}); }
