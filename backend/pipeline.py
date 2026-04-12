@@ -172,6 +172,7 @@ async def score_with_claude(path: Path) -> dict:
     Returns structured scoring including flattering check and scene tags.
     """
     if not config.ANTHROPIC_API_KEY:
+        print(f"[SCORE] No API key -- returning default 5.0 for {path.name}", flush=True)
         return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
 
     try:
@@ -183,25 +184,53 @@ async def score_with_claude(path: Path) -> dict:
         img.save(buf, format="JPEG", quality=75)
         b64 = base64.b64encode(buf.getvalue()).decode()
 
-        prompt = """Analyze this personal trip photo and respond with ONLY valid JSON, no markdown, no explanation.
+        prompt = """You are curating a family vacation photo album. Analyze this photo and respond with ONLY valid JSON, no markdown, no explanation.
 
 Return exactly this structure:
 {
-  "score": <1-10 float, overall keeper quality>,
-  "scene": "<2-4 word scene description e.g. beach swimming, city sightseeing, restaurant dinner, waterfall hiking, wildlife viewing, hotel arrival, family portrait>",
-  "flattering": <true or false - are ALL people in the photo looking good? Eyes open, good expression, not mid-blink, not caught awkwardly, lighting is kind to faces>,
-  "unflattering_reason": <null if flattering=true, otherwise brief reason e.g. "eyes closed", "mid-expression", "unflattering angle", "harsh shadows on face">,
-  "enhance_notes": <null if photo looks great, otherwise brief specific notes e.g. "slightly underexposed", "warm color cast", "slightly soft focus", "needs contrast boost">
+  "score": <1-10 float>,
+  "scene": "<2-4 word scene description>",
+  "flattering": <true or false>,
+  "unflattering_reason": <null or brief reason>,
+  "enhance_notes": <null or brief correction notes>
 }
 
-Scoring guide:
-- 9-10: Perfect shot, everyone looks great, excellent composition, genuine moment
-- 7-8: Good photo, minor technical issues or slightly staged
-- 5-6: Acceptable, some issues with composition or lighting
-- 3-4: Poor quality, bad lighting, or unflattering (even if technically sharp)
-- 1-2: Should not be in an album (accidental shot, test photo, very blurry)
+SCORING RULES for a family vacation album:
 
-Be honest about flattering - a technically sharp photo where someone looks bad should score low and flattering=false."""
+Score 1-2 (EXCLUDE -- not album-worthy):
+- QR codes, barcodes, tickets
+- Receipts, credit card statements, financial documents
+- Screenshots of apps, maps, messages
+- Photos of signs, menus, placards, documents
+- Completely empty landscapes with zero people (unless truly breathtaking)
+- Accidental shots, floor/ceiling/blur
+- Anyone mid-blink, mid-chew, or looking terrible
+
+Score 3-4 (WEAK -- only include if nothing better):
+- Technically ok but nobody looks good
+- Overly staged or awkward poses
+- Landscapes without family members
+- Food photos without people
+- Random objects (luggage, gear, hotel rooms with no people)
+- Backs of heads, people walking away
+
+Score 5-6 (ACCEPTABLE):
+- Decent family moments, minor issues
+- OK expressions, acceptable composition
+- Scenic shots with at least one family member
+
+Score 7-8 (GOOD):
+- Everyone looks nice, genuine moment
+- Good composition and lighting
+- Activity photos where family is clearly having fun
+
+Score 9-10 (EXCELLENT -- must include):
+- Perfect family moment, everyone looks great
+- Genuine joy, laughter, connection
+- Beautiful setting WITH family in it
+- Will be treasured for years
+
+FLATTERING check: Are ALL visible people looking good? Eyes open, good expression, not caught awkwardly, lighting kind to faces. If anyone looks bad, flattering=false."""
 
         payload = {
             "model": "claude-sonnet-4-20250514",
@@ -218,14 +247,21 @@ Be honest about flattering - a technically sharp photo where someone looks bad s
                 headers={"x-api-key": config.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
                 json=payload,
             )
-            text = r.json()["content"][0]["text"].strip()
-            # Strip markdown fences if present
+            resp_data = r.json()
+            if "error" in resp_data:
+                print(f"[SCORE] Anthropic API error: {resp_data['error']}", flush=True)
+                return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
+
+            text = resp_data["content"][0]["text"].strip()
             if text.startswith("```"):
                 text = text.split("```")[1]
                 if text.startswith("json"):
                     text = text[4:]
-            return json.loads(text.strip())
+            result = json.loads(text.strip())
+            print(f"[SCORE] {path.name}: {result.get('score')} | {result.get('scene')} | flattering={result.get('flattering')}", flush=True)
+            return result
     except Exception as e:
+        print(f"[SCORE] Exception scoring {path.name}: {e}", flush=True)
         return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
 
 
@@ -478,7 +514,7 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
         # 6. Filter unflattering, select keepers
-        flattering = [img for img in scored if img["flattering"]]
+        flattering = [img for img in scored if img["flattering"] and img.get("score", 5.0) >= 4.0]
         flattering.sort(key=lambda x: x["score"], reverse=True)
         target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
         keepers = flattering[:target_count]
