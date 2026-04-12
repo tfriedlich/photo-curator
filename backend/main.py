@@ -138,13 +138,22 @@ async def diagnose_token():
         r = await client.get(f"https://oauth2.googleapis.com/tokeninfo?access_token={token}")
         results["token_info"] = r.json()
         
-        # Try Photos API
-        r2 = await client.get(
+        # Try Photos API - mediaItems search
+        r2 = await client.post(
+            "https://photoslibrary.googleapis.com/v1/mediaItems:search",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"pageSize": 1, "filters": {"mediaTypeFilter": {"mediaTypes": ["PHOTO"]}}}
+        )
+        results["media_search_status"] = r2.status_code
+        results["media_search_response"] = r2.json()
+        
+        # Try albums list
+        r3 = await client.get(
             "https://photoslibrary.googleapis.com/v1/albums?pageSize=1",
             headers={"Authorization": f"Bearer {token}"}
         )
-        results["photos_api_status"] = r2.status_code
-        results["photos_api_response"] = r2.json()
+        results["albums_status"] = r3.status_code
+        results["albums_response"] = r3.json()
     
     return results
 
