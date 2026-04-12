@@ -465,7 +465,13 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
             cluster.sort(key=lambda x: x["cheap_score"], reverse=True)
 
         # 5. Claude scoring
-        candidates = [c[0] for c in clusters]
+        # Score top 2 candidates per cluster (best cheap scores)
+        # This prevents good photos being discarded because cluster[0] happened to score poorly
+        candidates = []
+        for c in clusters:
+            candidates.append(c[0])
+            if len(c) > 1:
+                candidates.append(c[1])
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=42)
         scored = []
         for i, img in enumerate(candidates):
@@ -497,12 +503,8 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
 
         flattering = [img for img in pre_keepers if img.get("flattering", True) and img.get("score", 5.0) >= config.MIN_SCORE]
         flattering.sort(key=lambda x: x["score"], reverse=True)
-        session_ratio = config.TARGET_KEEP_RATIO
-        if total_found < 100:
-            session_ratio = min(config.TARGET_KEEP_RATIO, 0.30)
-        if total_found < 50:
-            session_ratio = min(config.TARGET_KEEP_RATIO, 0.25)
-        target_count = max(5, int(total_found * session_ratio))
+        # target is % of total input photos, not scored candidates
+        target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
         keepers = flattering[:target_count]
 
         # 7. Thumbnails
@@ -693,7 +695,13 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
             cluster.sort(key=lambda x: x["cheap_score"], reverse=True)
 
         # 5. Claude scoring
-        candidates = [c[0] for c in clusters]
+        # Score top 2 candidates per cluster (best cheap scores)
+        # This prevents good photos being discarded because cluster[0] happened to score poorly
+        candidates = []
+        for c in clusters:
+            candidates.append(c[0])
+            if len(c) > 1:
+                candidates.append(c[1])
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=50)
         scored = []
         for i, img in enumerate(candidates):
@@ -725,12 +733,8 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
 
         flattering = [img for img in pre_keepers if img.get("flattering", True) and img.get("score", 5.0) >= config.MIN_SCORE]
         flattering.sort(key=lambda x: x["score"], reverse=True)
-        session_ratio = config.TARGET_KEEP_RATIO
-        if total_found < 100:
-            session_ratio = min(config.TARGET_KEEP_RATIO, 0.30)
-        if total_found < 50:
-            session_ratio = min(config.TARGET_KEEP_RATIO, 0.25)
-        target_count = max(5, int(total_found * session_ratio))
+        # target is % of total input photos, not scored candidates
+        target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
         keepers = flattering[:target_count]
 
         # 7. Thumbnails
