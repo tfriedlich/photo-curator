@@ -112,9 +112,12 @@ async def fetch_photo_histogram(
     end_date   = date.today()
     start_date = end_date - timedelta(days=days)
 
+    print(f"[EVENTS] Fetching histogram: {start_date} to {end_date}", flush=True)
+
     headers = {"Authorization": f"Bearer {access_token}"}
     day_map: dict[str, list] = defaultdict(list)
     next_page_token = None
+    page_count = 0
 
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
@@ -140,10 +143,16 @@ async def fetch_photo_histogram(
                 json=body,
             )
             data = r.json()
+
             if "error" in data:
+                print(f"[EVENTS] API error: {data['error']}", flush=True)
                 break
 
-            for item in data.get("mediaItems", []):
+            batch = data.get("mediaItems", [])
+            page_count += 1
+            print(f"[EVENTS] Page {page_count}: got {len(batch)} items, total so far: {sum(len(v) for v in day_map.values()) + len(batch)}", flush=True)
+
+            for item in batch:
                 ct = item.get("mediaMetadata", {}).get("creationTime", "")
                 day = ct[:10] if ct else None
                 if not day:
@@ -158,6 +167,8 @@ async def fetch_photo_histogram(
                 break
             await asyncio.sleep(0.05)
 
+    total = sum(len(v) for v in day_map.values())
+    print(f"[EVENTS] Done. {total} photos across {len(day_map)} days", flush=True)
     return dict(day_map)
 
 
@@ -167,6 +178,7 @@ def detect_events(day_map: dict[str, list]) -> list[dict]:
     Returns list of {start, end, photo_count, lat_lngs}
     """
     if not day_map:
+        print("[EVENTS] detect_events: day_map is empty", flush=True)
         return []
 
     # Build sorted day counts
@@ -176,13 +188,21 @@ def detect_events(day_map: dict[str, list]) -> list[dict]:
     # Baseline = median daily count
     vals = sorted(counts.values())
     median = vals[len(vals)//2] if vals else 1
-    baseline = max(median, 2)  # floor of 2 to avoid div-by-zero on very sparse libraries
+    baseline = max(median, 2)
     threshold = baseline * config.BASELINE_MULTIPLIER
+
+    print(f"[EVENTS] {len(day_map)} days, median={median}, baseline={baseline}, threshold={threshold} (multiplier={config.BASELINE_MULTIPLIER}), min_photos={config.MIN_PHOTOS_FOR_EVENT}", flush=True)
+
+    # Show top 10 days by count
+    top_days = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    print(f"[EVENTS] Top days: {top_days}", flush=True)
 
     # Flag notable days
     notable = {d for d, c in counts.items() if c >= threshold and c >= config.MIN_PHOTOS_FOR_EVENT}
+    print(f"[EVENTS] Notable days found: {sorted(notable)}", flush=True)
 
     if not notable:
+        print(f"[EVENTS] No notable days -- highest count was {top_days[0][1] if top_days else 0}, threshold was {threshold}", flush=True)
         return []
 
     # Merge adjacent/nearby notable days (gap of 1 normal day allowed)
