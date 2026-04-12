@@ -522,9 +522,11 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
         # This prevents good photos being discarded because cluster[0] happened to score poorly
         candidates = []
         seen_paths = set()
-        for c in clusters:
+        for cluster_idx, c in enumerate(clusters):
             for member in c[:2]:  # safe -- slicing never raises IndexError
                 if member["path"] not in seen_paths:
+                    member["cluster_idx"] = cluster_idx  # assign here, not during scoring
+                    member["cluster_size"] = len(c)
                     candidates.append(member)
                     seen_paths.add(member["path"])
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=50)
@@ -538,9 +540,6 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
             img["scene"] = result.get("scene", "")
             img["enhance_notes"] = result.get("enhance_notes")
             img["unflattering_reason"] = result.get("unflattering_reason")
-            # Find index in original clusters list
-            img["cluster_idx"] = i
-            img["cluster_size"] = len(clusters[i])
             scored.append(img)
             if i % 10 == 0:
                 pct = 50 + int((i / len(candidates)) * 28)
