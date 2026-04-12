@@ -12,7 +12,7 @@ from pydantic import BaseModel
 import shutil
 
 import config
-from pipeline import run_pipeline, confirm_and_upload, enhance_photo
+from pipeline import run_pipeline, confirm_and_upload, enhance_photo, pick_best_from_cluster
 from state import job_store
 
 app = FastAPI(title="Photo Curator")
@@ -483,7 +483,6 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
         # 6. Select keepers using smart cluster picking
-        from pipeline import pick_best_from_cluster
         scored_by_cluster = {}
         for img in scored:
             idx = img["cluster_idx"]
@@ -712,7 +711,6 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
                 update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
 
         # 6. Select keepers using smart cluster picking
-        from pipeline import pick_best_from_cluster
         scored_by_cluster = {}
         for img in scored:
             idx = img["cluster_idx"]

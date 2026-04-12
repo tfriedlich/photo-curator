@@ -184,6 +184,13 @@ def cluster_duplicates(images):
     return list(groups.values())
 
 
+def pick_best_from_cluster(cluster: list, max_keep: int = 1) -> list:
+    """Keep only the single best photo from each cluster. Best score wins.
+    The swap button in the UI lets users cycle through alternatives."""
+    sorted_cluster = sorted(cluster, key=lambda x: x.get("score", x.get("cheap_score", 0)), reverse=True)
+    return [sorted_cluster[0]]
+
+
 # ── Stage 4: Claude Vision scoring ────────────────────────────────────────────
 async def score_with_claude(path: Path) -> dict:
     """
