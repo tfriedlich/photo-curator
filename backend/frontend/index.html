@@ -22,133 +22,115 @@
     .tagline { margin-top: 10px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
     .ornament { color: var(--amber); font-size: 18px; letter-spacing: 8px; margin: 8px 0 32px; }
 
-    /* Layout */
-    .layout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; width: 100%; max-width: 1100px; align-items: start; }
-    @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } .albums-panel { order: -1; } }
-
-    .card { background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 2px 24px var(--shadow); overflow: hidden; }
+    .card { width: 100%; max-width: 640px; background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 2px 24px var(--shadow); overflow: hidden; }
+    .card-body { padding: 36px; }
     .slabel { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: block; }
     .divider { height: 1px; background: var(--border); }
+    .field { margin-bottom: 20px; }
 
-    /* Connect wall */
-    #connect-wall { padding: 48px 32px; text-align: center; }
-    #connect-wall .wi { font-size: 44px; margin-bottom: 16px; }
-    #connect-wall h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 8px; }
-    #connect-wall p { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
-    .btn-big { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; text-decoration: none; }
-    .btn-big:hover { background: #b8782a; }
+    /* Google connect banner */
+    .google-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 3px; margin-bottom: 24px; border: 1px solid var(--border); background: var(--paper); }
+    .google-banner.connected { border-color: #86efac; background: #f0fdf4; }
+    .google-banner.disconnected { border-color: #fca5a5; background: #fef2f2; }
+    .google-icon { font-size: 20px; flex-shrink: 0; }
+    .google-text { flex: 1; }
+    .google-text strong { display: block; font-size: 12px; font-weight: 500; color: var(--ink); }
+    .google-text span { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .btn-connect { padding: 8px 14px; border-radius: 3px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; white-space: nowrap; transition: background 0.2s; flex-shrink: 0; }
+    .btn-connect.connect { background: var(--amber); color: white; }
+    .btn-connect.connect:hover { background: #b8782a; }
+    .btn-connect.disconnect { background: var(--cream); color: var(--muted); border: 1px solid var(--border); }
 
-    /* Connected strip */
-    #connected-strip { display: none; align-items: center; gap: 12px; padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #86efac; }
-    #connected-strip.show { display: flex; }
-    #connected-strip span { flex: 1; font-size: 12px; color: var(--green); font-family: 'DM Mono', monospace; }
-    .btn-sm { background: none; border: 1px solid var(--border); border-radius: 3px; padding: 5px 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
-    .btn-sm:hover { background: var(--cream); }
+    /* Inputs */
+    input[type="text"] { width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink); outline: none; transition: border-color 0.2s; }
+    input[type="text"]:focus { border-color: var(--amber); }
 
-    /* Suggestions */
-    #suggestions-section { display: none; padding: 20px 28px 0; }
-    #suggestions-section.show { display: block; }
-    .suggestions-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
-    .event-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); cursor: pointer; transition: all 0.15s; text-align: left; width: 100%; }
-    .event-card:hover, .event-card.selected { border-color: var(--amber); background: var(--amber-pale); }
-    .event-card.selected { box-shadow: 0 0 0 2px rgba(200,136,58,0.2); }
-    .ei { font-size: 18px; flex-shrink: 0; }
-    .event-info { flex: 1; min-width: 0; }
-    .en { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .em { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
-    .ec { font-size: 10px; color: var(--amber); font-family: 'DM Mono', monospace; white-space: nowrap; flex-shrink: 0; }
-    .sloading { padding: 12px 0; text-align: center; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
-    .expand-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; }
-    .expand-label { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
-    .month-picker { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-size: 11px; font-family: 'DM Sans', sans-serif; color: var(--ink); outline: none; }
-    .month-picker:focus { border-color: var(--amber); }
-    .btn-expand { padding: 7px 12px; background: var(--cream); border: 1px solid var(--border); border-radius: 3px; font-size: 10px; color: var(--ink); cursor: pointer; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+    /* Dropzone */
+    .dropzone { border: 2px dashed var(--border); border-radius: 3px; padding: 40px 32px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--amber-pale); position: relative; margin-bottom: 8px; }
+    .dropzone:hover, .dropzone.drag-over { border-color: var(--amber); background: #fef8ed; }
+    .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { font-size: 32px; margin-bottom: 10px; display: block; }
+    .drop-title { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--ink); margin-bottom: 5px; }
+    .drop-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .file-selected { display: none; align-items: center; gap: 10px; padding: 12px 14px; background: var(--cream); border: 1px solid var(--border); border-radius: 3px; margin-bottom: 4px; }
+    .file-selected.show { display: flex; }
+    .file-name { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .file-size { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
 
-    /* Form */
-    #form-section { display: none; padding: 16px 28px 28px; }
-    #form-section.show { display: block; }
-    .form-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-    .form-divider-line { flex: 1; height: 1px; background: var(--border); }
-    .form-divider-label { font-size: 9px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
-    .field { margin-bottom: 14px; }
-    input[type="text"], input[type="date"] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--paper); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink); outline: none; transition: border-color 0.2s; }
-    input[type="text"]:focus, input[type="date"]:focus { border-color: var(--amber); }
-    .date-row { display: flex; gap: 10px; margin-bottom: 14px; }
-    .date-row .field { flex: 1; margin-bottom: 0; }
-    .btn-submit { width: 100%; padding: 13px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; margin-top: 2px; }
+    .btn-submit { width: 100%; margin-top: 20px; padding: 14px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
     .btn-submit:hover:not(:disabled) { background: #b8782a; }
     .btn-submit:disabled { background: var(--muted); cursor: not-allowed; }
 
+    /* How-to note */
+    .how-to { background: var(--cream); border: 1px solid var(--border); border-radius: 3px; padding: 14px 16px; margin-bottom: 24px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+    .how-to strong { color: var(--ink); font-weight: 500; }
+    .how-to a { color: var(--amber); text-decoration: none; }
+    .how-to a:hover { text-decoration: underline; }
+
     /* Progress */
-    #progress-panel { display: none; padding: 20px 28px 28px; }
+    #progress-panel { display: none; padding: 24px 36px 32px; }
     #progress-panel.show { display: block; }
-    .stage-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink); margin-bottom: 10px; min-height: 16px; }
-    .progress-track { height: 4px; background: var(--cream); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+    .stage-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink); margin-bottom: 12px; }
+    .progress-track { height: 4px; background: var(--cream); border-radius: 2px; overflow: hidden; margin-bottom: 18px; }
     .progress-fill { height: 100%; background: var(--amber); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
-    .stats-row { display: flex; gap: 14px; }
-    .stat { flex: 1; background: var(--paper); border: 1px solid var(--border); border-radius: 3px; padding: 10px 12px; }
-    .stat-value { font-family: 'Playfair Display', serif; font-size: 24px; color: var(--ink); line-height: 1; margin-bottom: 2px; }
+    .stats-row { display: flex; gap: 16px; }
+    .stat { flex: 1; background: var(--paper); border: 1px solid var(--border); border-radius: 3px; padding: 12px 14px; }
+    .stat-value { font-family: 'Playfair Display', serif; font-size: 26px; color: var(--ink); line-height: 1; margin-bottom: 3px; }
     .stat-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
 
-    /* ── Preview panel ── */
+    /* Preview */
     #preview-panel { display: none; }
     #preview-panel.show { display: block; }
-
-    .preview-header { padding: 20px 28px 16px; border-bottom: 1px solid var(--border); }
+    .preview-header { padding: 20px 36px 16px; border-bottom: 1px solid var(--border); }
     .preview-title { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 4px; }
     .preview-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 14px; }
-
-    /* Ratio slider */
     .ratio-row { display: flex; align-items: center; gap: 12px; }
     .ratio-label { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
     input[type="range"] { flex: 1; accent-color: var(--amber); cursor: pointer; }
     .ratio-count { font-size: 12px; font-weight: 500; color: var(--amber); font-family: 'DM Mono', monospace; white-space: nowrap; min-width: 60px; text-align: right; }
 
-    /* Day groups */
-    .preview-days { padding: 0 28px 28px; }
-
+    .preview-days { padding: 0 36px 28px; }
     .day-group { margin-top: 24px; }
     .day-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
     .day-name { font-family: 'Playfair Display', serif; font-size: 16px; font-style: italic; }
     .day-date { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; }
     .day-count { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-left: auto; }
+    .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
 
-    .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-
-    /* Photo card */
     .photo-card { position: relative; border-radius: 3px; overflow: hidden; border: 2px solid transparent; transition: border-color 0.15s; background: var(--cream); }
     .photo-card:hover .photo-actions { opacity: 1; }
     .photo-card.removed { opacity: 0.25; border-color: var(--red); }
     .photo-card.removed .photo-actions { opacity: 1; }
     .photo-card.enhanced { border-color: var(--green); }
-
     .photo-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-    .photo-placeholder { width: 100%; aspect-ratio: 1; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 24px; }
-
     .photo-score { position: absolute; top: 4px; left: 4px; background: rgba(26,22,18,0.7); color: white; font-size: 9px; font-family: 'DM Mono', monospace; padding: 2px 5px; border-radius: 2px; }
     .photo-badge { position: absolute; top: 4px; right: 4px; font-size: 9px; font-family: 'DM Mono', monospace; padding: 2px 5px; border-radius: 2px; text-transform: uppercase; }
     .photo-badge.enhanced { background: var(--green); color: white; }
-
     .photo-actions { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(26,22,18,0.82); display: flex; gap: 1px; opacity: 0; transition: opacity 0.15s; }
     .photo-action { flex: 1; padding: 6px 2px; background: none; border: none; color: white; font-size: 11px; cursor: pointer; transition: background 0.1s; text-align: center; font-family: 'DM Sans', sans-serif; }
     .photo-action:hover { background: rgba(255,255,255,0.15); }
     .photo-action.restore { color: #86efac; }
-    .photo-action.swap-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
+    .photo-action:disabled { opacity: 0.4; cursor: not-allowed; }
     .enhance-desc { font-size: 9px; color: var(--green); font-family: 'DM Mono', monospace; padding: 3px 6px; background: #f0fdf4; border-top: 1px solid #86efac; line-height: 1.3; }
 
-    /* Confirm bar */
-    .confirm-bar { position: sticky; bottom: 0; background: white; border-top: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; gap: 16px; box-shadow: 0 -4px 16px var(--shadow); }
+    .confirm-bar { position: sticky; bottom: 0; background: white; border-top: 1px solid var(--border); padding: 14px 36px; display: flex; align-items: center; gap: 14px; box-shadow: 0 -4px 16px var(--shadow); }
     .confirm-summary { flex: 1; font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
     .confirm-summary strong { color: var(--ink); }
-    .btn-confirm { padding: 12px 28px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+    .btn-confirm { padding: 12px 24px; background: var(--amber); color: white; border: none; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
     .btn-confirm:hover { background: #b8782a; }
     .btn-confirm:disabled { background: var(--muted); cursor: not-allowed; }
-    .btn-back { padding: 12px 18px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; }
+    .btn-back { padding: 12px 16px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; }
     .btn-back:hover { background: var(--cream); }
 
+    /* Uploading */
+    #uploading-panel { display: none; padding: 40px 36px; text-align: center; }
+    .up-icon { font-size: 36px; margin-bottom: 12px; animation: spin 2s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .up-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 8px; }
+    .up-stage { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
     /* Results */
-    .result { display: none; padding: 24px 28px 32px; text-align: center; }
+    .result { display: none; padding: 28px 36px 36px; text-align: center; }
     .result.show { display: block; }
     .result-icon { font-size: 36px; margin-bottom: 12px; }
     .result-title { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 8px; }
@@ -158,32 +140,9 @@
     .btn-reset { display: block; margin: 8px auto 0; background: none; border: none; color: var(--muted); font-size: 11px; font-family: 'DM Mono', monospace; cursor: pointer; text-decoration: underline; }
     .error-msg { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 3px; padding: 12px 14px; font-size: 12px; color: var(--red); font-family: 'DM Mono', monospace; word-break: break-word; text-align: left; }
 
-    /* Albums panel */
-    .albums-panel { display: flex; flex-direction: column; }
-    .albums-header { padding: 16px 18px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .albums-header h2 { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 400; }
-    .btn-refresh { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 15px; padding: 2px 5px; border-radius: 2px; }
-    .btn-refresh:hover { background: var(--cream); }
-    .albums-placeholder { padding: 28px 18px; text-align: center; color: var(--muted); font-size: 11px; font-family: 'DM Mono', monospace; line-height: 1.8; }
-    .albums-list { display: flex; flex-direction: column; }
-    .album-card { display: flex; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s; position: relative; overflow: hidden; }
-    .album-card:last-child { border-bottom: none; }
-    .album-card:hover { background: var(--amber-pale); }
-    .album-thumb { width: 68px; height: 68px; flex-shrink: 0; object-fit: cover; background: var(--cream); }
-    .album-thumb-ph { width: 68px; height: 68px; flex-shrink: 0; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 20px; }
-    .album-info { padding: 9px 11px; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
-    .album-title { font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .album-meta { font-size: 9px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .app-badge { position: absolute; top: 5px; right: 5px; background: var(--amber); color: white; font-size: 7px; font-family: 'DM Mono', monospace; padding: 2px 4px; border-radius: 2px; text-transform: uppercase; }
-
     .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 20px; border-radius: 3px; font-size: 12px; font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 1000; }
     .toast.show { opacity: 1; }
     .footer-note { margin-top: 28px; text-align: center; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; line-height: 1.8; }
-
-    /* Uploading overlay */
-    .uploading-overlay { padding: 32px 28px; text-align: center; }
-    .uploading-overlay .wi { font-size: 36px; margin-bottom: 12px; animation: spin 2s linear infinite; display: inline-block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -193,271 +152,200 @@
     <div class="tagline">Trip photos → curated album, automatically</div>
   </header>
 
-  <div class="layout">
-    <!-- Albums panel -->
-    <div class="albums-panel card" id="albums-panel">
-      <div class="albums-header">
-        <h2>Recent Albums</h2>
-        <button class="btn-refresh" onclick="loadAlbums()" title="Refresh">↻</button>
+  <div class="card">
+    <div class="card-body" id="upload-panel">
+
+      <!-- Google Photos connection -->
+      <div class="google-banner disconnected" id="google-banner">
+        <span class="google-icon">📷</span>
+        <div class="google-text">
+          <strong id="google-status-text">Google Photos not connected</strong>
+          <span id="google-status-sub">Connect to automatically create your curated album</span>
+        </div>
+        <button class="btn-connect connect" id="google-btn" onclick="handleGoogleBtn()">Connect</button>
       </div>
-      <div class="albums-placeholder" id="albums-placeholder">Connect Google Photos<br>to see your albums</div>
-      <div class="albums-list" id="albums-list" style="display:none;"></div>
+
+      <!-- How to get Takeout ZIP -->
+      <div class="how-to">
+        <strong>How to export your trip photos:</strong><br>
+        1. Go to <a href="https://takeout.google.com" target="_blank">takeout.google.com</a><br>
+        2. Select only <strong>Google Photos</strong> → choose your trip album or date range<br>
+        3. Export as ZIP → download when ready (takes 10–30 min)<br>
+        4. Upload the ZIP below
+      </div>
+
+      <div class="field">
+        <span class="slabel">Album name</span>
+        <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026"/>
+      </div>
+
+      <span class="slabel">Google Takeout ZIP</span>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".zip"/>
+        <span class="drop-icon">📦</span>
+        <div class="drop-title">Drop your Takeout ZIP here</div>
+        <div class="drop-sub">or click to browse · .zip files only</div>
+      </div>
+      <div class="file-selected" id="file-selected">
+        <span style="font-size:16px;">🗜</span>
+        <span class="file-name" id="file-name-label">—</span>
+        <span class="file-size" id="file-size-label">—</span>
+      </div>
+
+      <button class="btn-submit" id="submit-btn" disabled onclick="startUpload()">
+        Curate &amp; Preview Photos
+      </button>
     </div>
 
-    <!-- Main card -->
-    <div class="card" id="main-card">
+    <div class="divider" id="progress-divider" style="display:none;"></div>
 
-      <!-- Not connected -->
-      <div id="connect-wall">
-        <div class="wi">📷</div>
-        <h2>Connect Google Photos</h2>
-        <p>Sign in to detect trips, suggest album names,<br>preview your best photos, and curate automatically.</p>
-        <a href="/auth/login" class="btn-big">🔗 Connect Google Photos</a>
+    <!-- Progress -->
+    <div id="progress-panel">
+      <span class="slabel">Pipeline progress</span>
+      <div class="stage-label" id="stage-label">Initializing...</div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Photos found</div></div>
+        <div class="stat"><div class="stat-value" id="stat-kept">—</div><div class="stat-label">Candidates</div></div>
       </div>
+    </div>
 
-      <!-- Connected strip -->
-      <div id="connected-strip">
-        <span>✓ Google Photos connected</span>
-        <button class="btn-sm" onclick="disconnect()">Disconnect</button>
-      </div>
-
-      <!-- Suggestions -->
-      <div id="suggestions-section">
-        <div style="padding: 16px 28px 0;"><span class="slabel">Detected events</span></div>
-        <div style="padding: 0 28px;">
-          <div class="sloading" id="suggestions-loading">Analyzing your photo library...</div>
-          <div class="suggestions-grid" id="suggestions-grid" style="display:none;"></div>
-          <div id="suggestions-empty" style="display:none;" class="sloading">No notable events found in the last <span id="days-searched">60</span> days.</div>
-          <div class="expand-row" id="expand-row" style="display:none;">
-            <span class="expand-label">Look further back:</span>
-            <input type="month" class="month-picker" id="expand-month"/>
-            <button class="btn-expand" onclick="expandSearch()">Search</button>
-          </div>
+    <!-- Preview -->
+    <div id="preview-panel">
+      <div class="preview-header">
+        <div class="preview-title" id="preview-title">Album Preview</div>
+        <div class="preview-meta" id="preview-meta"></div>
+        <div class="ratio-row">
+          <span class="ratio-label">Fewer</span>
+          <input type="range" id="ratio-slider" min="5" max="50" value="20" oninput="onRatioChange(this.value)"/>
+          <span class="ratio-label">More</span>
+          <span class="ratio-count" id="ratio-count">— photos</span>
         </div>
       </div>
-
-      <div class="divider" id="form-divider" style="display:none;"></div>
-
-      <!-- Form -->
-      <div id="form-section">
-        <div class="form-divider"><div class="form-divider-line"></div><div class="form-divider-label">or set dates manually</div><div class="form-divider-line"></div></div>
-        <div class="field"><span class="slabel">Album name</span>
-          <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026"/>
-        </div>
-        <span class="slabel">Date range</span>
-        <div class="date-row">
-          <div class="field"><span class="slabel">From</span><input type="date" id="start-date"/></div>
-          <div class="field"><span class="slabel">To</span><input type="date" id="end-date"/></div>
-        </div>
-        <button class="btn-submit" id="submit-btn" onclick="startCurate()">Fetch &amp; Preview Photos</button>
+      <div class="preview-days" id="preview-days"></div>
+      <div class="confirm-bar">
+        <div class="confirm-summary" id="confirm-summary"></div>
+        <button class="btn-back" onclick="backToForm()">← Start over</button>
+        <button class="btn-confirm" id="confirm-btn" onclick="confirmAlbum()">Create Album →</button>
       </div>
+    </div>
 
-      <div class="divider" id="progress-divider" style="display:none;"></div>
+    <!-- Uploading -->
+    <div id="uploading-panel">
+      <div class="up-icon">⚙️</div>
+      <div class="up-title">Creating your album...</div>
+      <div class="up-stage" id="upload-stage">Uploading photos</div>
+    </div>
 
-      <!-- Progress -->
-      <div id="progress-panel">
-        <span class="slabel" style="padding: 0;">Pipeline progress</span>
-        <div class="stage-label" id="stage-label">Initializing...</div>
-        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-        <div class="stats-row">
-          <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Photos found</div></div>
-          <div class="stat"><div class="stat-value" id="stat-kept">—</div><div class="stat-label">Candidates</div></div>
-        </div>
-      </div>
+    <!-- Success -->
+    <div class="result" id="result-success">
+      <div class="result-icon">🎞</div>
+      <div class="result-title">Album ready</div>
+      <div class="result-sub" id="result-summary"></div>
+      <a href="#" id="album-link" class="btn-album" target="_blank">Open in Google Photos →</a>
+      <button class="btn-reset" onclick="reset()">Curate another trip</button>
+    </div>
 
-      <!-- Preview panel -->
-      <div id="preview-panel">
-        <div class="preview-header">
-          <div class="preview-title" id="preview-title">Album Preview</div>
-          <div class="preview-meta" id="preview-meta"></div>
-          <div class="ratio-row">
-            <span class="ratio-label">Fewer</span>
-            <input type="range" id="ratio-slider" min="5" max="50" value="20" oninput="onRatioChange(this.value)"/>
-            <span class="ratio-label">More</span>
-            <span class="ratio-count" id="ratio-count">— photos</span>
-          </div>
-        </div>
-        <div class="preview-days" id="preview-days"></div>
-        <div class="confirm-bar">
-          <div class="confirm-summary" id="confirm-summary"></div>
-          <button class="btn-back" onclick="backToForm()">← Edit dates</button>
-          <button class="btn-confirm" id="confirm-btn" onclick="confirmAlbum()">Create Album →</button>
-        </div>
-      </div>
-
-      <!-- Uploading -->
-      <div id="uploading-panel" style="display:none;">
-        <div class="uploading-overlay">
-          <div class="wi">⚙️</div>
-          <div style="font-family:'Playfair Display',serif;font-size:18px;margin-bottom:8px;">Creating your album...</div>
-          <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;" id="upload-stage">Uploading photos</div>
-        </div>
-      </div>
-
-      <!-- Success -->
-      <div class="result" id="result-success">
-        <div class="result-icon">🎞</div>
-        <div class="result-title">Album ready</div>
-        <div class="result-sub" id="result-summary"></div>
-        <a href="#" id="album-link" class="btn-album" target="_blank">Open in Google Photos →</a>
-        <button class="btn-reset" onclick="reset()">Curate another event</button>
-      </div>
-
-      <!-- Error -->
-      <div class="result" id="result-error">
-        <div class="result-icon">⚠️</div>
-        <div class="result-title">Something went wrong</div>
-        <div class="error-msg" id="error-msg"></div>
-        <button class="btn-reset" style="margin-top:16px;" onclick="reset()">Try again</button>
-      </div>
-
+    <!-- Error -->
+    <div class="result" id="result-error">
+      <div class="result-icon">⚠️</div>
+      <div class="result-title">Something went wrong</div>
+      <div class="error-msg" id="error-msg"></div>
+      <button class="btn-reset" style="margin-top:16px;" onclick="reset()">Try again</button>
     </div>
   </div>
 
   <div class="footer-note">
-    Fetches directly from Google Photos · Preview and edit before creating<br>
-    Pipeline: fetch → dedup → AI scoring (flattering filter) → narrative naming → preview
+    Export via Google Takeout · AI scoring filters unflattering shots · Preview before creating<br>
+    Typical cost: $1–3 per trip · Typical time: 10–20 min for 1,000 photos
   </div>
   <div class="toast" id="toast"></div>
 
 <script>
   const API = window.location.origin;
+  let selectedFile = null;
   let pollInterval = null;
   let currentJobId = null;
-  let previewState = null; // local mirror of preview payload
+  let previewState = null;
 
-  // ── Init ──
   window.addEventListener('load', async () => {
-    const today = new Date();
-    const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
-    document.getElementById('end-date').value = today.toISOString().split('T')[0];
-    document.getElementById('start-date').value = weekAgo.toISOString().split('T')[0];
-    const em = document.getElementById('expand-month');
-    em.max = today.toISOString().slice(0,7);
-    const threeBack = new Date(today); threeBack.setMonth(threeBack.getMonth()-3);
-    em.value = threeBack.toISOString().slice(0,7);
-
     const params = new URLSearchParams(window.location.search);
     const auth = params.get('auth');
-    if (auth === 'success') { showToast('✓ Google Photos connected'); history.replaceState({},'',' /'); }
+    if (auth === 'success') { showToast('✓ Google Photos connected'); history.replaceState({},'','/'); }
     else if (auth === 'error') { showToast('✗ ' + (params.get('reason') || 'Connection failed')); history.replaceState({},'','/'); }
-
     await checkAuth();
   });
 
   async function checkAuth() {
     try {
       const { connected } = await (await fetch(`${API}/auth/status`)).json();
-      setConnectedState(connected);
-      if (connected) { loadAlbums(); loadSuggestions(); }
-    } catch(e) { setConnectedState(false); }
+      updateGoogleBanner(connected);
+    } catch(e) { updateGoogleBanner(false); }
   }
 
-  function setConnectedState(connected) {
-    document.getElementById('connect-wall').style.display = connected ? 'none' : 'block';
-    document.getElementById('connected-strip').classList.toggle('show', connected);
-    document.getElementById('suggestions-section').classList.toggle('show', connected);
-    document.getElementById('form-divider').style.display = connected ? 'block' : 'none';
-    document.getElementById('form-section').classList.toggle('show', connected);
-    document.getElementById('albums-placeholder').textContent = connected ? 'Loading albums...' : 'Connect Google Photos\nto see your albums';
+  function updateGoogleBanner(connected) {
+    const banner = document.getElementById('google-banner');
+    const text = document.getElementById('google-status-text');
+    const sub = document.getElementById('google-status-sub');
+    const btn = document.getElementById('google-btn');
+    if (connected) {
+      banner.className = 'google-banner connected';
+      text.textContent = 'Google Photos connected';
+      sub.textContent = 'Curated album will be created automatically';
+      btn.textContent = 'Disconnect';
+      btn.className = 'btn-connect disconnect';
+    } else {
+      banner.className = 'google-banner disconnected';
+      text.textContent = 'Google Photos not connected';
+      sub.textContent = 'Connect to automatically create your curated album';
+      btn.textContent = 'Connect';
+      btn.className = 'btn-connect connect';
+    }
   }
 
-  async function disconnect() {
-    await fetch(`${API}/auth/disconnect`, { method: 'POST' });
-    setConnectedState(false);
-    document.getElementById('albums-list').style.display = 'none';
-    document.getElementById('albums-placeholder').style.display = 'block';
-    document.getElementById('albums-placeholder').textContent = 'Connect Google Photos\nto see your albums';
-    showToast('Disconnected');
+  function handleGoogleBtn() {
+    const btn = document.getElementById('google-btn');
+    if (btn.textContent === 'Disconnect') {
+      fetch(`${API}/auth/disconnect`, { method: 'POST' }).then(() => { updateGoogleBanner(false); showToast('Disconnected'); });
+    } else {
+      window.location.href = `${API}/auth/login`;
+    }
   }
 
-  // ── Suggestions ──
-  async function loadSuggestions(days) {
-    const grid = document.getElementById('suggestions-grid');
-    const loading = document.getElementById('suggestions-loading');
-    const empty = document.getElementById('suggestions-empty');
-    const expandRow = document.getElementById('expand-row');
-    grid.style.display = 'none'; empty.style.display = 'none';
-    expandRow.style.display = 'none'; loading.style.display = 'block';
-    loading.textContent = 'Analyzing your photo library...';
-    try {
-      const url = days ? `${API}/api/events?days=${days}` : `${API}/api/events`;
-      const { events, days_searched } = await (await fetch(url)).json();
-      document.getElementById('days-searched').textContent = days_searched;
-      loading.style.display = 'none';
-      expandRow.style.display = 'flex';
-      if (!events || !events.length) { empty.style.display = 'block'; return; }
-      grid.innerHTML = ''; grid.style.display = 'flex';
-      events.forEach(ev => {
-        const card = document.createElement('button');
-        card.className = 'event-card';
-        card.onclick = () => selectEvent(ev, card);
-        const icon = ev.photo_count >= 200 ? '✈️' : ev.photo_count >= 80 ? '🏖️' : '🎉';
-        const s = new Date(ev.start+'T12:00:00'), e = new Date(ev.end+'T12:00:00');
-        const dateStr = ev.start === ev.end
-          ? s.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
-          : `${s.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${e.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
-        card.innerHTML = `<span class="ei">${icon}</span><div class="event-info"><div class="en">${esc(ev.album_name)}</div><div class="em">${dateStr}${ev.location?' · 📍'+esc(ev.location):''}</div></div><span class="ec">${ev.photo_count}</span>`;
-        grid.appendChild(card);
-      });
-    } catch(e) { loading.textContent = 'Could not load suggestions.'; expandRow.style.display = 'flex'; }
+  // Drag & drop
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f && f.name.endsWith('.zip')) setFile(f); });
+  document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+
+  function setFile(f) {
+    selectedFile = f;
+    document.getElementById('file-name-label').textContent = f.name;
+    document.getElementById('file-size-label').textContent = formatBytes(f.size);
+    document.getElementById('file-selected').classList.add('show');
+    document.getElementById('submit-btn').disabled = false;
   }
 
-  function selectEvent(ev, cardEl) {
-    document.querySelectorAll('.event-card').forEach(c => c.classList.remove('selected'));
-    cardEl.classList.add('selected');
-    document.getElementById('album-name').value = ev.album_name;
-    document.getElementById('start-date').value = ev.start;
-    document.getElementById('end-date').value = ev.end;
-    document.getElementById('form-section').scrollIntoView({behavior:'smooth',block:'nearest'});
+  function formatBytes(b) {
+    if (b > 1e9) return (b/1e9).toFixed(1)+' GB';
+    if (b > 1e6) return (b/1e6).toFixed(1)+' MB';
+    return (b/1e3).toFixed(0)+' KB';
   }
 
-  async function expandSearch() {
-    const month = document.getElementById('expand-month').value;
-    if (!month) return;
-    const then = new Date(month+'-01'), now = new Date();
-    const days = Math.min(Math.ceil((now-then)/(86400000))+31, 365);
-    await loadSuggestions(days);
-  }
-
-  // ── Albums ──
-  async function loadAlbums() {
-    const ph = document.getElementById('albums-placeholder');
-    const list = document.getElementById('albums-list');
-    ph.style.display = 'block'; ph.textContent = 'Loading albums...'; list.style.display = 'none';
-    try {
-      const { albums } = await (await fetch(`${API}/api/albums`)).json();
-      list.innerHTML = '';
-      if (!albums || !albums.length) { ph.textContent = 'No albums found.'; return; }
-      ph.style.display = 'none'; list.style.display = 'flex';
-      albums.forEach(album => {
-        const card = document.createElement('a');
-        card.className = 'album-card'; card.href = album.product_url||'#'; card.target = '_blank'; card.rel = 'noopener';
-        const thumb = album.cover_url ? `<img class="album-thumb" src="${album.cover_url}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="album-thumb-ph">🖼</div>`;
-        const m1 = [album.date_range, album.photo_count?`${album.photo_count} photos`:null].filter(Boolean).join(' · ');
-        card.innerHTML = `${thumb}<div class="album-info"><div class="album-title">${esc(album.title)}</div>${m1?`<div class="album-meta">${esc(m1)}</div>`:''} ${album.location?`<div class="album-meta">📍 ${esc(album.location)}</div>`:''}</div>${album.created_by_app?'<div class="app-badge">Curated</div>':''}`;
-        list.appendChild(card);
-      });
-    } catch(e) { ph.textContent = 'Could not load albums.'; }
-  }
-
-  // ── Curate ──
-  async function startCurate() {
+  async function startUpload() {
+    if (!selectedFile) return;
     const albumName = document.getElementById('album-name').value.trim() || 'Best Of Trip';
-    const startDate = document.getElementById('start-date').value;
-    const endDate = document.getElementById('end-date').value;
-    if (!startDate || !endDate) { showToast('Please select a date range'); return; }
-    if (endDate < startDate) { showToast('✗ End date must be after start date'); return; }
-
     document.getElementById('submit-btn').disabled = true;
     showSection('progress');
 
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('album_name', albumName);
+
     try {
-      const r = await fetch(`${API}/api/curate`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({start_date: startDate, end_date: endDate, album_name: albumName}),
-      });
-      if (!r.ok) { const err = await r.json(); showError(err.detail||'Failed to start'); return; }
+      const r = await fetch(`${API}/api/upload`, { method: 'POST', body: fd });
+      if (!r.ok) { const err = await r.json(); showError(err.detail || 'Upload failed'); return; }
       const { job_id } = await r.json();
       currentJobId = job_id;
       pollJob(job_id);
@@ -469,13 +357,12 @@
       try {
         const job = await (await fetch(`${API}/api/status/${jobId}`)).json();
         document.getElementById('stage-label').textContent = job.stage || '...';
-        document.getElementById('progress-fill').style.width = (job.progress||0) + '%';
+        document.getElementById('progress-fill').style.width = (job.progress||0)+'%';
         if (job.total) document.getElementById('stat-total').textContent = job.total.toLocaleString();
         if (job.kept) document.getElementById('stat-kept').textContent = job.kept.toLocaleString();
-
         if (job.status === 'preview_ready') { clearInterval(pollInterval); await loadPreview(jobId); }
         else if (job.status === 'uploading') { clearInterval(pollInterval); showSection('uploading'); pollUpload(jobId); }
-        else if (job.status === 'done') { clearInterval(pollInterval); showDone(job); loadAlbums(); }
+        else if (job.status === 'done') { clearInterval(pollInterval); showDone(job); }
         else if (job.status === 'error') { clearInterval(pollInterval); showError(job.error||'Unknown error'); }
       } catch(e) {}
     }, 2000);
@@ -486,54 +373,38 @@
       try {
         const job = await (await fetch(`${API}/api/status/${jobId}`)).json();
         document.getElementById('upload-stage').textContent = job.stage || 'Uploading...';
-        if (job.status === 'done') { clearInterval(pollInterval); showDone(job); loadAlbums(); }
+        if (job.status === 'done') { clearInterval(pollInterval); showDone(job); }
         else if (job.status === 'error') { clearInterval(pollInterval); showError(job.error||'Upload failed'); }
       } catch(e) {}
     }, 2000);
   }
 
-  // ── Preview ──
   async function loadPreview(jobId) {
     try {
       const preview = await (await fetch(`${API}/api/preview/${jobId}`)).json();
       previewState = preview;
       renderPreview(jobId);
       showSection('preview');
-    } catch(e) {
-      showError('Could not load preview: ' + e.message);
-    }
+    } catch(e) { showError('Could not load preview: ' + e.message); }
   }
 
   function renderPreview(jobId) {
     const preview = previewState;
     document.getElementById('preview-title').textContent = preview.album_name;
-
     const totalKept = countKept();
     document.getElementById('preview-meta').textContent = `${preview.total_found} photos found · ${totalKept} selected`;
     document.getElementById('ratio-count').textContent = `${totalKept} photos`;
     updateConfirmSummary();
-
     const container = document.getElementById('preview-days');
     container.innerHTML = '';
-
     preview.days.forEach(day => {
       const group = document.createElement('div');
       group.className = 'day-group';
       const kept = day.photos.filter(p => !p.removed).length;
-      group.innerHTML = `
-        <div class="day-header">
-          <div class="day-name">${esc(day.day_name)}</div>
-          <div class="day-date">${formatDate(day.date)}</div>
-          <div class="day-count">${kept} of ${day.photos_found} kept</div>
-        </div>
-        <div class="photos-grid" id="grid-${day.date}"></div>
-      `;
+      group.innerHTML = `<div class="day-header"><div class="day-name">${esc(day.day_name)}</div><div class="day-date">${formatDate(day.date)}</div><div class="day-count">${kept} of ${day.photos_found} kept</div></div><div class="photos-grid" id="grid-${day.date}"></div>`;
       container.appendChild(group);
-
       const grid = group.querySelector(`#grid-${day.date}`);
-      day.photos.forEach(photo => {
-        grid.appendChild(makePhotoCard(photo, day.date, jobId));
-      });
+      day.photos.forEach(photo => grid.appendChild(makePhotoCard(photo, day.date, jobId)));
     });
   }
 
@@ -541,19 +412,17 @@
     const card = document.createElement('div');
     card.className = `photo-card${photo.removed?' removed':''}${photo.enhanced?' enhanced':''}`;
     card.id = `card-${photo.id}`;
-
     const imgSrc = `${API}/api/preview/${jobId}/thumb/${photo.filename}`;
     const hasAlt = photo.has_alternatives;
-
     card.innerHTML = `
-      <img class="photo-img" src="${imgSrc}" alt="" loading="lazy" onerror="this.parentElement.querySelector('.photo-img').style.display='none'">
+      <img class="photo-img" src="${imgSrc}" alt="" loading="lazy">
       <div class="photo-score">${photo.score}</div>
-      ${photo.enhanced ? `<div class="photo-badge enhanced">✨</div>` : ''}
+      ${photo.enhanced ? '<div class="photo-badge enhanced">✨</div>' : ''}
       <div class="photo-actions">
         ${photo.removed
           ? `<button class="photo-action restore" onclick="restorePhoto('${photo.id}','${dayDate}')">↩ Restore</button>`
           : `<button class="photo-action" onclick="removePhoto('${photo.id}','${dayDate}')">✕</button>
-             <button class="photo-action swap-btn" onclick="swapPhoto('${photo.id}','${dayDate}')" ${!hasAlt?'disabled':''} title="${hasAlt?'Swap for next best':'No alternatives'}">↻</button>
+             <button class="photo-action" onclick="swapPhoto('${photo.id}','${dayDate}')" ${!hasAlt?'disabled':''}>↻</button>
              <button class="photo-action" onclick="enhancePhoto('${photo.id}','${dayDate}')">✨</button>`
         }
       </div>
@@ -563,8 +432,7 @@
   }
 
   function findPhoto(photoId, dayDate) {
-    const preview = previewState;
-    for (const day of preview.days) {
+    for (const day of previewState.days) {
       if (day.date === dayDate) {
         for (const photo of day.photos) {
           if (photo.id === photoId) return photo;
@@ -577,73 +445,45 @@
   function refreshCard(photo, dayDate) {
     const card = document.getElementById(`card-${photo.id}`);
     if (!card) return;
-    const newCard = makePhotoCard(photo, dayDate, currentJobId);
-    card.replaceWith(newCard);
+    card.replaceWith(makePhotoCard(photo, dayDate, currentJobId));
     updateDayCount(dayDate);
     updateConfirmSummary();
-    document.getElementById('preview-meta').textContent = `${previewState.total_found} photos found · ${countKept()} selected`;
-    document.getElementById('ratio-count').textContent = `${countKept()} photos`;
+    const kept = countKept();
+    document.getElementById('preview-meta').textContent = `${previewState.total_found} photos found · ${kept} selected`;
+    document.getElementById('ratio-count').textContent = `${kept} photos`;
   }
 
   async function removePhoto(photoId, dayDate) {
-    await fetch(`${API}/api/preview/${currentJobId}/remove`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({photo_id: photoId, day: dayDate}),
-    });
+    await fetch(`${API}/api/preview/${currentJobId}/remove`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
     const photo = findPhoto(photoId, dayDate);
     if (photo) { photo.removed = true; refreshCard(photo, dayDate); }
   }
 
-  async function restorePhoto(photoId, dayDate) {
+  function restorePhoto(photoId, dayDate) {
     const photo = findPhoto(photoId, dayDate);
     if (photo) { photo.removed = false; refreshCard(photo, dayDate); }
-    // Sync removal state back to server (it wasn't actually server-side removed, just marked)
   }
 
   async function swapPhoto(photoId, dayDate) {
-    const btn = document.querySelector(`#card-${photoId} .swap-btn`);
-    if (btn) btn.disabled = true;
     try {
-      const r = await fetch(`${API}/api/preview/${currentJobId}/swap`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({photo_id: photoId, day: dayDate}),
-      });
+      const r = await fetch(`${API}/api/preview/${currentJobId}/swap`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
       if (!r.ok) { showToast('No alternatives available'); return; }
       const { new_photo } = await r.json();
-      // Update local state
       const day = previewState.days.find(d => d.date === dayDate);
       if (day) {
         const idx = day.photos.findIndex(p => p.id === photoId);
-        if (idx >= 0) {
-          day.photos[idx] = new_photo;
-          // Remove old card, insert new
-          const oldCard = document.getElementById(`card-${photoId}`);
-          if (oldCard) oldCard.replaceWith(makePhotoCard(new_photo, dayDate, currentJobId));
-        }
+        if (idx >= 0) { day.photos[idx] = new_photo; const old = document.getElementById(`card-${photoId}`); if (old) old.replaceWith(makePhotoCard(new_photo, dayDate, currentJobId)); }
       }
-    } catch(e) { showToast('Swap failed'); if (btn) btn.disabled = false; }
+    } catch(e) { showToast('Swap failed'); }
   }
 
   async function enhancePhoto(photoId, dayDate) {
-    const btn = document.querySelector(`#card-${photoId} .photo-action:last-child`);
-    if (btn) { btn.textContent = '...'; btn.disabled = true; }
     try {
-      const r = await fetch(`${API}/api/preview/${currentJobId}/enhance`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({photo_id: photoId, day: dayDate}),
-      });
+      const r = await fetch(`${API}/api/preview/${currentJobId}/enhance`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
       if (!r.ok) { showToast('Enhancement failed'); return; }
       const { description } = await r.json();
       const photo = findPhoto(photoId, dayDate);
-      if (photo) {
-        photo.enhanced = true;
-        photo.enhance_description = description;
-        // Force img reload
-        const img = document.querySelector(`#card-${photoId} .photo-img`);
-        if (img) img.src = img.src + '?t=' + Date.now();
-        refreshCard(photo, dayDate);
-        showToast('✨ ' + description);
-      }
+      if (photo) { photo.enhanced = true; photo.enhance_description = description; const img = document.querySelector(`#card-${photoId} .photo-img`); if (img) img.src = img.src + '?t='+Date.now(); refreshCard(photo, dayDate); showToast('✨ ' + description); }
     } catch(e) { showToast('Enhancement failed'); }
   }
 
@@ -651,40 +491,22 @@
   async function onRatioChange(val) {
     clearTimeout(ratioTimer);
     ratioTimer = setTimeout(async () => {
-      const ratio = val / 100;
-      const r = await fetch(`${API}/api/preview/${currentJobId}/ratio`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ratio}),
-      });
-      if (r.ok) {
-        const { kept } = await r.json();
-        // Reload preview to get updated removed states
-        const preview = await (await fetch(`${API}/api/preview/${currentJobId}`)).json();
-        previewState = preview;
-        renderPreview(currentJobId);
-      }
+      const r = await fetch(`${API}/api/preview/${currentJobId}/ratio`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ratio: val/100}) });
+      if (r.ok) { const preview = await (await fetch(`${API}/api/preview/${currentJobId}`)).json(); previewState = preview; renderPreview(currentJobId); }
     }, 400);
   }
 
-  function countKept() {
-    if (!previewState) return 0;
-    return previewState.days.reduce((sum, day) => sum + day.photos.filter(p => !p.removed).length, 0);
-  }
-
+  function countKept() { return previewState ? previewState.days.reduce((s,d) => s + d.photos.filter(p=>!p.removed).length, 0) : 0; }
   function updateDayCount(dayDate) {
     const day = previewState.days.find(d => d.date === dayDate);
     if (!day) return;
     const kept = day.photos.filter(p => !p.removed).length;
-    const header = document.querySelector(`#grid-${dayDate}`)?.previousElementSibling;
-    if (header) {
-      const countEl = header.querySelector('.day-count');
-      if (countEl) countEl.textContent = `${kept} of ${day.photos_found} kept`;
-    }
+    const grid = document.getElementById(`grid-${dayDate}`);
+    if (grid) { const countEl = grid.previousElementSibling?.querySelector('.day-count'); if (countEl) countEl.textContent = `${kept} of ${day.photos_found} kept`; }
   }
-
   function updateConfirmSummary() {
     const kept = countKept();
-    const enhanced = previewState?.days.reduce((sum, d) => sum + d.photos.filter(p => p.enhanced).length, 0) || 0;
+    const enhanced = previewState?.days.reduce((s,d) => s + d.photos.filter(p=>p.enhanced).length, 0) || 0;
     let text = `<strong>${kept} photos</strong> selected`;
     if (enhanced > 0) text += ` · ${enhanced} enhanced`;
     document.getElementById('confirm-summary').innerHTML = text;
@@ -692,8 +514,7 @@
 
   async function confirmAlbum() {
     const btn = document.getElementById('confirm-btn');
-    btn.disabled = true;
-    btn.textContent = 'Creating...';
+    btn.disabled = true; btn.textContent = 'Creating...';
     try {
       const r = await fetch(`${API}/api/confirm/${currentJobId}`, { method: 'POST' });
       if (!r.ok) { const err = await r.json(); showError(err.detail||'Confirm failed'); return; }
@@ -702,23 +523,17 @@
     } catch(e) { showError(e.message); btn.disabled = false; btn.textContent = 'Create Album →'; }
   }
 
-  function backToForm() {
-    showSection('form');
-    document.getElementById('submit-btn').disabled = false;
-  }
+  function backToForm() { showSection('none'); document.getElementById('submit-btn').disabled = false; }
 
   function showDone(job) {
     const pct = job.total ? Math.round((job.kept/job.total)*100) : '?';
-    document.getElementById('result-summary').textContent = `${job.kept} photos in your new album (${pct}% of ${job.total} found). All duplicates and unflattering shots removed.`;
-    document.getElementById('album-link').href = job.album_url;
+    document.getElementById('result-summary').textContent = `${job.kept} photos in your new album (${pct}% of ${job.total} found). Unflattering shots and duplicates removed.`;
+    document.getElementById('album-link').href = job.album_url === 'no_google_token' ? '#' : job.album_url;
+    if (job.album_url === 'no_google_token') document.getElementById('album-link').textContent = 'Connect Google Photos to create album';
     showSection('success');
   }
 
-  function showError(msg) {
-    document.getElementById('error-msg').textContent = msg;
-    showSection('error');
-    document.getElementById('submit-btn').disabled = false;
-  }
+  function showError(msg) { document.getElementById('error-msg').textContent = msg; showSection('error'); document.getElementById('submit-btn').disabled = false; }
 
   function showSection(name) {
     document.getElementById('progress-divider').style.display = 'none';
@@ -727,48 +542,30 @@
     document.getElementById('uploading-panel').style.display = 'none';
     document.getElementById('result-success').classList.remove('show');
     document.getElementById('result-error').classList.remove('show');
-
-    if (name === 'progress') {
-      document.getElementById('progress-divider').style.display = 'block';
-      document.getElementById('progress-panel').classList.add('show');
-    } else if (name === 'preview') {
-      document.getElementById('preview-panel').classList.add('show');
-    } else if (name === 'uploading') {
-      document.getElementById('uploading-panel').style.display = 'block';
-    } else if (name === 'success') {
-      document.getElementById('result-success').classList.add('show');
-    } else if (name === 'error') {
-      document.getElementById('result-error').classList.add('show');
-    }
-    // 'form' = just reset, show nothing extra
+    if (name === 'progress') { document.getElementById('progress-divider').style.display='block'; document.getElementById('progress-panel').classList.add('show'); }
+    else if (name === 'preview') { document.getElementById('preview-panel').classList.add('show'); }
+    else if (name === 'uploading') { document.getElementById('uploading-panel').style.display='block'; }
+    else if (name === 'success') { document.getElementById('result-success').classList.add('show'); }
+    else if (name === 'error') { document.getElementById('result-error').classList.add('show'); }
   }
 
   function reset() {
-    currentJobId = null; previewState = null;
+    selectedFile = null; previewState = null; currentJobId = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-selected').classList.remove('show');
+    document.getElementById('submit-btn').disabled = true;
     document.getElementById('progress-fill').style.width = '0%';
     document.getElementById('stat-total').textContent = '—';
     document.getElementById('stat-kept').textContent = '—';
-    document.getElementById('submit-btn').disabled = false;
     document.getElementById('confirm-btn').disabled = false;
     document.getElementById('confirm-btn').textContent = 'Create Album →';
-    document.querySelectorAll('.event-card').forEach(c => c.classList.remove('selected'));
     showSection('none');
     clearInterval(pollInterval);
   }
 
-  function formatDate(d) {
-    return new Date(d+'T12:00:00').toLocaleDateString('en-US', {weekday:'short', month:'long', day:'numeric', year:'numeric'});
-  }
-
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-  }
-
-  function esc(str) {
-    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+  function formatDate(d) { return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'}); }
+  function showToast(msg) { const t = document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
+  function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
 </html>

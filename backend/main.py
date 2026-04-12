@@ -4,45 +4,36 @@ import urllib.parse
 import httpx
 from pathlib import Path
 from datetime import date
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import shutil
 
 import config
-from pipeline import run_pipeline, confirm_and_upload, enhance_photo, score_with_claude
+from pipeline import run_pipeline, confirm_and_upload, enhance_photo
 from state import job_store
-from events import get_events
 
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
-GOOGLE_SCOPES = " ".join([
-    "https://www.googleapis.com/auth/photoslibrary.readonly",
-    "https://www.googleapis.com/auth/photoslibrary.appendonly",
-    "https://www.googleapis.com/auth/photoslibrary",
-])
+GOOGLE_SCOPES = "https://www.googleapis.com/auth/photoslibrary.appendonly"
 
-# Token store -- seeded from env vars on startup
-# Refresh token persisted in GOOGLE_REFRESH_TOKEN env var (set manually after first OAuth)
+UPLOAD_DIR = Path("/tmp/photo-curator/uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 token_store: dict = {
-    "access_token":  os.environ.get("GOOGLE_PHOTOS_TOKEN", ""),
+    "access_token": os.environ.get("GOOGLE_PHOTOS_TOKEN", ""),
     "refresh_token": os.environ.get("GOOGLE_REFRESH_TOKEN", ""),
 }
 created_album_ids: set = set()
 
 
 async def get_valid_token() -> str:
-    """
-    Return a valid access token, auto-refreshing if needed.
-    Access tokens expire after 1hr -- refresh token lasts indefinitely.
-    """
-    # Try existing access token first
     access_token = token_store.get("access_token", "")
     if access_token:
-        # Quick validation -- ping Google
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 r = await client.get(
@@ -53,9 +44,8 @@ async def get_valid_token() -> str:
                 if r.status_code != 401:
                     return access_token
         except Exception:
-            return access_token  # Network error, try with existing token
+            return access_token
 
-    # Access token expired or missing -- try refresh
     refresh_token = token_store.get("refresh_token", "")
     if not refresh_token:
         return ""
@@ -77,7 +67,6 @@ async def get_valid_token() -> str:
             return data["access_token"]
     except Exception:
         pass
-
     return ""
 
 
@@ -86,8 +75,14 @@ async def get_valid_token() -> str:
 async def auth_login():
     if not config.GOOGLE_CLIENT_ID:
         raise HTTPException(500, "GOOGLE_CLIENT_ID not configured")
-    params = {"client_id": config.GOOGLE_CLIENT_ID, "redirect_uri": REDIRECT_URI, "response_type": "code",
-              "scope": GOOGLE_SCOPES, "access_type": "offline", "prompt": "consent"}
+    params = {
+        "client_id": config.GOOGLE_CLIENT_ID,
+        "redirect_uri": REDIRECT_URI,
+        "response_type": "code",
+        "scope": GOOGLE_SCOPES,
+        "access_type": "offline",
+        "prompt": "consent",
+    }
     return RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params))
 
 
@@ -97,26 +92,25 @@ async def auth_callback(code: str = None, error: str = None):
     if not code: return RedirectResponse("/?auth=error&reason=no_code")
     async with httpx.AsyncClient() as client:
         r = await client.post("https://oauth2.googleapis.com/token", data={
-            "code": code, "client_id": config.GOOGLE_CLIENT_ID,
+            "code": code,
+            "client_id": config.GOOGLE_CLIENT_ID,
             "client_secret": config.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": REDIRECT_URI, "grant_type": "authorization_code",
+            "redirect_uri": REDIRECT_URI,
+            "grant_type": "authorization_code",
         })
         data = r.json()
     if "access_token" not in data:
         return RedirectResponse("/?auth=error&reason=token_exchange_failed")
     token_store["access_token"] = data["access_token"]
     token_store["refresh_token"] = data.get("refresh_token", token_store.get("refresh_token", ""))
-    # NOTE: After first successful OAuth, copy the refresh_token to Railway env var
-    # GOOGLE_REFRESH_TOKEN so it survives restarts. Print it to logs for easy copy.
     if data.get("refresh_token"):
-        print(f"[AUTH] New refresh token obtained. Add to Railway env: GOOGLE_REFRESH_TOKEN={data['refresh_token'][:20]}...")
+        print(f"[AUTH] New refresh token: GOOGLE_REFRESH_TOKEN={data['refresh_token']}", flush=True)
     return RedirectResponse("/?auth=success")
 
 
 @app.get("/auth/status")
 async def auth_status():
-    token = await get_valid_token()
-    return {"connected": bool(token)}
+    return {"connected": bool(token_store.get("access_token") or token_store.get("refresh_token"))}
 
 
 @app.post("/auth/disconnect")
@@ -125,149 +119,74 @@ async def auth_disconnect():
     token_store["refresh_token"] = ""
     return {"ok": True}
 
-@app.get("/auth/diagnose")
-async def diagnose_token():
-    """Test the current token against Google APIs and show what scopes it has."""
-    token = await get_valid_token()
-    if not token:
-        return {"error": "No token available"}
-    
-    results = {}
-    async with httpx.AsyncClient(timeout=10) as client:
-        # Check token info
-        r = await client.get(f"https://oauth2.googleapis.com/tokeninfo?access_token={token}")
-        results["token_info"] = r.json()
-        
-        # Try Photos API - mediaItems search
-        r2 = await client.post(
-            "https://photoslibrary.googleapis.com/v1/mediaItems:search",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"pageSize": 1, "filters": {"mediaTypeFilter": {"mediaTypes": ["PHOTO"]}}}
-        )
-        results["media_search_status"] = r2.status_code
-        results["media_search_response"] = r2.json()
-        
-        # Try albums list
-        r3 = await client.get(
-            "https://photoslibrary.googleapis.com/v1/albums?pageSize=1",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        results["albums_status"] = r3.status_code
-        results["albums_response"] = r3.json()
-    
-    return results
 
 @app.get("/auth/refresh-token")
 async def get_refresh_token():
-    """One-time endpoint to retrieve refresh token for Railway env setup."""
     rt = token_store.get("refresh_token", "")
     if not rt:
-        return {"error": "No refresh token in memory. Please reconnect Google Photos first."}
-    return {"refresh_token": rt, "instructions": "Add this as GOOGLE_REFRESH_TOKEN in Railway variables, then you can delete this endpoint."}
+        return {"error": "No refresh token. Please reconnect Google Photos first."}
+    return {"refresh_token": rt}
 
 
-# ── Events ─────────────────────────────────────────────────────────────────────
-@app.get("/api/events")
-async def get_event_suggestions(days: int = None):
-    access_token = await get_valid_token()
-    if not access_token: raise HTTPException(401, "Not connected")
-    days = min(days or config.LOOKBACK_DAYS, config.MAX_LOOKBACK_DAYS)
-    events = await get_events(access_token, days)
-    return {"events": events, "days_searched": days}
+# ── Upload ZIP ─────────────────────────────────────────────────────────────────
+@app.post("/api/upload")
+async def upload_zip(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    album_name: str = "Best Of Trip",
+):
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(400, "Must be a .zip file (Google Takeout export)")
 
-
-# ── Albums ─────────────────────────────────────────────────────────────────────
-@app.get("/api/albums")
-async def get_albums():
-    access_token = await get_valid_token()
-    if not access_token: raise HTTPException(401, "Not connected")
-    headers = {"Authorization": f"Bearer {access_token}"}
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.get("https://photoslibrary.googleapis.com/v1/albums", headers=headers, params={"pageSize": 20})
-        data = r.json()
-        if "error" in data: raise HTTPException(400, data["error"].get("message", "API error"))
-        albums_raw = data.get("albums", [])[:10]
-        albums = []
-        for album in albums_raw:
-            album_id = album.get("id", "")
-            cover_url = (album.get("coverPhotoBaseUrl", "") + "=w400-h300-c") if album.get("coverPhotoBaseUrl") else ""
-            date_range = location = None
-            try:
-                mr = await client.post("https://photoslibrary.googleapis.com/v1/mediaItems:search",
-                    headers=headers, json={"albumId": album_id, "pageSize": 10})
-                items = mr.json().get("mediaItems", [])
-                if items:
-                    times = sorted(t for t in (i.get("mediaMetadata", {}).get("creationTime", "")[:10] for i in items) if t)
-                    if times: date_range = times[0] if times[0] == times[-1] else f"{times[0]} – {times[-1]}"
-                    for item in items:
-                        meta = item.get("mediaMetadata", {})
-                        lat = meta.get("photo", {}).get("latitude")
-                        lng = meta.get("photo", {}).get("longitude")
-                        if lat and lng:
-                            geo = await client.get("https://nominatim.openstreetmap.org/reverse",
-                                params={"lat": lat, "lon": lng, "format": "json"},
-                                headers={"User-Agent": "PhotoCurator/1.0"})
-                            addr = geo.json().get("address", {})
-                            parts = [addr.get("city") or addr.get("town") or addr.get("village"), addr.get("country")]
-                            location = ", ".join(p for p in parts if p)
-                            break
-            except Exception:
-                pass
-            albums.append({"id": album_id, "title": album.get("title", "Untitled"), "cover_url": cover_url,
-                "photo_count": album.get("mediaItemsCount", "?"), "product_url": album.get("productUrl", ""),
-                "date_range": date_range, "location": location, "created_by_app": album_id in created_album_ids})
-    return {"albums": albums}
-
-
-# ── Curate ─────────────────────────────────────────────────────────────────────
-class CurateRequest(BaseModel):
-    start_date: date
-    end_date: date
-    album_name: str = "Best Of Trip"
-
-@app.post("/api/curate")
-async def start_curate(req: CurateRequest, background_tasks: BackgroundTasks):
-    access_token = await get_valid_token()
-    if not access_token: raise HTTPException(401, "Google Photos not connected")
-    if req.end_date < req.start_date: raise HTTPException(400, "End date must be after start date")
     job_id = str(uuid.uuid4())
-    job_store[job_id] = {"status": "queued", "stage": "Starting", "progress": 0,
-        "total": 0, "kept": 0, "album_url": None, "error": None, "album_name": req.album_name}
-    background_tasks.add_task(run_pipeline, job_id, req.start_date, req.end_date,
-        req.album_name, access_token, created_album_ids)
+    zip_path = UPLOAD_DIR / f"{job_id}.zip"
+
+    with open(zip_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    job_store[job_id] = {
+        "status": "queued", "stage": "Uploaded", "progress": 0,
+        "total": 0, "kept": 0, "album_url": None, "error": None,
+        "album_name": album_name,
+    }
+
+    access_token = await get_valid_token()
+    background_tasks.add_task(run_pipeline_from_zip, job_id, zip_path, album_name, access_token)
     return {"job_id": job_id}
 
+
+# ── Preview endpoints ──────────────────────────────────────────────────────────
 @app.get("/api/status/{job_id}")
 async def get_status(job_id: str):
     if job_id not in job_store: raise HTTPException(404, "Job not found")
     job = job_store[job_id]
-    # Return lightweight status (no full preview payload)
     return {k: v for k, v in job.items() if k not in ("preview", "all_clusters", "work_dir")}
 
 
-# ── Preview endpoints ──────────────────────────────────────────────────────────
 @app.get("/api/preview/{job_id}")
 async def get_preview(job_id: str):
-    if job_id not in job_store: raise HTTPException(404, "Job not found")
+    if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     if job["status"] not in ("preview_ready", "uploading"): raise HTTPException(400, "Preview not ready")
     return job["preview"]
+
 
 @app.get("/api/preview/{job_id}/thumb/{filename}")
 async def get_thumb(job_id: str, filename: str):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     work_dir = Path(job.get("work_dir", ""))
-    # Try enhanced first, then original thumb
     thumb_path = work_dir / "thumbs" / filename
     if not thumb_path.exists():
         thumb_path = work_dir / filename
     if not thumb_path.exists(): raise HTTPException(404)
     return FileResponse(str(thumb_path), media_type="image/jpeg")
 
+
 class PhotoAction(BaseModel):
     photo_id: str
     day: str
+
 
 @app.post("/api/preview/{job_id}/remove")
 async def remove_photo(job_id: str, action: PhotoAction):
@@ -281,12 +200,11 @@ async def remove_photo(job_id: str, action: PhotoAction):
                     return {"ok": True}
     raise HTTPException(404, "Photo not found")
 
+
 @app.post("/api/preview/{job_id}/swap")
 async def swap_photo(job_id: str, action: PhotoAction):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
-
-    # Find the photo and its cluster
     target_photo = None
     for day in job["preview"]["days"]:
         if day["date"] == action.day:
@@ -294,25 +212,16 @@ async def swap_photo(job_id: str, action: PhotoAction):
                 if photo["id"] == action.photo_id:
                     target_photo = photo
                     break
-
-    if not target_photo: raise HTTPException(404, "Photo not found")
-
+    if not target_photo: raise HTTPException(404)
     cluster_idx = target_photo.get("cluster_idx")
     if cluster_idx is None: raise HTTPException(400, "No cluster info")
-
     cluster = job["all_clusters"][cluster_idx]
     if len(cluster) <= 1: raise HTTPException(400, "No alternatives available")
-
-    # Find next best flattering alternative not already shown
     current_ids = {p["id"] for day in job["preview"]["days"] for p in day["photos"]}
     alternatives = [c for c in cluster[1:] if c["filename"] not in current_ids and c.get("flattering", True)]
-
     if not alternatives: raise HTTPException(400, "No flattering alternatives available")
-
     next_best = alternatives[0]
     work_dir = Path(job["work_dir"])
-
-    # Generate thumb for the new photo
     try:
         from PIL import Image
         thumbs_dir = work_dir / "thumbs"
@@ -325,8 +234,6 @@ async def swap_photo(job_id: str, action: PhotoAction):
                 img.save(thumb_path, "JPEG", quality=80)
     except Exception:
         pass
-
-    # Update photo in preview
     target_photo["id"] = next_best["filename"]
     target_photo["filename"] = next_best["filename"]
     target_photo["score"] = round(next_best.get("score", 5.0), 1)
@@ -334,14 +241,13 @@ async def swap_photo(job_id: str, action: PhotoAction):
     target_photo["enhance_notes"] = next_best.get("enhance_notes")
     target_photo["has_alternatives"] = len(cluster) > 2
     target_photo["enhanced"] = False
-
     return {"ok": True, "new_photo": target_photo}
+
 
 @app.post("/api/preview/{job_id}/enhance")
 async def enhance_photo_endpoint(job_id: str, action: PhotoAction):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
-
     target_photo = None
     for day in job["preview"]["days"]:
         if day["date"] == action.day:
@@ -349,17 +255,11 @@ async def enhance_photo_endpoint(job_id: str, action: PhotoAction):
                 if photo["id"] == action.photo_id:
                     target_photo = photo
                     break
-
-    if not target_photo: raise HTTPException(404, "Photo not found")
-
+    if not target_photo: raise HTTPException(404)
     work_dir = Path(job["work_dir"])
     photo_path = work_dir / target_photo["filename"]
-    if not photo_path.exists(): raise HTTPException(404, "Photo file not found")
-
-    enhance_notes = target_photo.get("enhance_notes") or "auto enhance"
-    enhanced_path, description = await enhance_photo(photo_path, enhance_notes)
-
-    # Update thumb
+    if not photo_path.exists(): raise HTTPException(404)
+    enhanced_path, description = await enhance_photo(photo_path, target_photo.get("enhance_notes") or "auto enhance")
     try:
         from PIL import Image
         thumbs_dir = work_dir / "thumbs"
@@ -368,49 +268,39 @@ async def enhance_photo_endpoint(job_id: str, action: PhotoAction):
         thumb.save(thumbs_dir / target_photo["filename"], "JPEG", quality=80)
     except Exception:
         pass
-
     target_photo["enhanced"] = True
     target_photo["enhance_description"] = description
-
     return {"ok": True, "description": description}
+
 
 class RatioRequest(BaseModel):
     ratio: float
 
 @app.post("/api/preview/{job_id}/ratio")
 async def adjust_ratio(job_id: str, req: RatioRequest):
-    """Re-slice the candidate pool at a different keep ratio."""
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     if job["status"] != "preview_ready": raise HTTPException(400, "Preview not ready")
-
     ratio = max(0.05, min(0.50, req.ratio))
     total = job["preview"]["total_found"]
     target = max(10, int(total * ratio))
-
-    # Flatten all current photos, re-rank by score, take top N
     all_photos = [p for day in job["preview"]["days"] for p in day["photos"]]
     all_photos.sort(key=lambda p: p["score"], reverse=True)
-
-    # Mark removed/included based on new target
     keep_ids = {p["id"] for p in all_photos[:target]}
     for day in job["preview"]["days"]:
         for photo in day["photos"]:
             if not photo.get("manually_kept") and not photo.get("manually_removed"):
                 photo["removed"] = photo["id"] not in keep_ids
-
     kept = sum(1 for day in job["preview"]["days"] for p in day["photos"] if not p.get("removed"))
     return {"ok": True, "kept": kept}
 
 
-# ── Confirm upload ─────────────────────────────────────────────────────────────
 @app.post("/api/confirm/{job_id}")
 async def confirm_album(job_id: str, background_tasks: BackgroundTasks):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     if job["status"] != "preview_ready": raise HTTPException(400, "Not in preview state")
     access_token = await get_valid_token()
-    if not access_token: raise HTTPException(401, "Not connected")
     background_tasks.add_task(confirm_and_upload, job_id, access_token, created_album_ids)
     return {"ok": True}
 
@@ -423,3 +313,157 @@ async def health():
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
+
+# ── ZIP pipeline wrapper ───────────────────────────────────────────────────────
+async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, access_token: str):
+    """Extract ZIP and run the full curation pipeline."""
+    import zipfile
+    from pipeline import (
+        is_screenshot, blur_score, exposure_score, perceptual_hash,
+        get_exif_datetime, cluster_duplicates, score_with_claude,
+        generate_trip_narrative, upload_to_google_photos, confirm_and_upload,
+        update_job, WORK_DIR
+    )
+    from state import job_store
+    import shutil
+
+    work_dir = WORK_DIR / job_id
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+        thumbs_dir = work_dir / "thumbs"
+        thumbs_dir.mkdir(exist_ok=True)
+
+        # 1. Extract ZIP
+        update_job(job_id, status="running", stage="Extracting ZIP", progress=5)
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(work_dir)
+
+        # 2. Collect images
+        IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"}
+        image_paths = [f for f in work_dir.rglob("*")
+                      if f.suffix.lower() in IMAGE_EXTENSIONS and f.is_file()
+                      and "thumbs" not in str(f)]
+        total_found = len(image_paths)
+        update_job(job_id, total=total_found, stage=f"Found {total_found} photos", progress=15)
+
+        if total_found == 0:
+            update_job(job_id, status="error", error="No images found in ZIP")
+            return
+
+        # 3. Cheap filters
+        update_job(job_id, stage=f"Analyzing {total_found} photos", progress=20)
+        images = []
+        for i, path in enumerate(image_paths):
+            if is_screenshot(path): continue
+            ct = get_exif_datetime(path)
+            day = ct.strftime("%Y-%m-%d") if ct else "unknown"
+            images.append({
+                "path": path, "blur": blur_score(path), "exposure": exposure_score(path),
+                "hash": perceptual_hash(path), "dt": ct, "day": day,
+                "filename": path.name, "item_id": path.stem, "claude_result": None,
+            })
+            if i % 50 == 0:
+                pct = 20 + int((i / total_found) * 15)
+                update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{total_found})")
+
+        images = [img for img in images
+                  if img["blur"] > config.MIN_BLUR_SCORE and img["exposure"] > config.MIN_EXPOSURE_SCORE]
+
+        # 4. Cluster
+        update_job(job_id, stage="Clustering duplicates", progress=36)
+        clusters = cluster_duplicates(images)
+        for cluster in clusters:
+            for img in cluster:
+                img["cheap_score"] = img["blur"] * 0.6 + img["exposure"] * 0.4
+            cluster.sort(key=lambda x: x["cheap_score"], reverse=True)
+
+        # 5. Claude scoring
+        candidates = [c[0] for c in clusters]
+        update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=42)
+        scored = []
+        for i, img in enumerate(candidates):
+            result = await score_with_claude(img["path"])
+            img["claude_result"] = result
+            img["score"] = result.get("score", 5.0)
+            img["flattering"] = result.get("flattering", True)
+            img["scene"] = result.get("scene", "")
+            img["enhance_notes"] = result.get("enhance_notes")
+            img["cluster_idx"] = i
+            img["cluster_size"] = len(clusters[i])
+            scored.append(img)
+            if i % 10 == 0:
+                pct = 42 + int((i / len(candidates)) * 30)
+                update_job(job_id, progress=pct, stage=f"AI scoring ({i}/{len(candidates)})")
+
+        # 6. Select keepers
+        flattering = [img for img in scored if img["flattering"]]
+        flattering.sort(key=lambda x: x["score"], reverse=True)
+        target_count = max(10, int(total_found * config.TARGET_KEEP_RATIO))
+        keepers = flattering[:target_count]
+
+        # 7. Thumbnails
+        update_job(job_id, stage="Generating preview thumbnails", progress=74)
+        for img in keepers:
+            try:
+                from PIL import Image
+                thumb = Image.open(img["path"]).convert("RGB")
+                thumb.thumbnail((400, 400))
+                thumb_path = thumbs_dir / img["filename"]
+                thumb.save(thumb_path, "JPEG", quality=80)
+                img["thumb"] = img["filename"]
+            except Exception:
+                img["thumb"] = None
+
+        # 8. Trip narrative
+        update_job(job_id, stage="Writing trip narrative", progress=80)
+        days_map = {}
+        for img in keepers:
+            d = img["day"]
+            if d not in days_map: days_map[d] = []
+            days_map[d].append(img)
+
+        days_summary = []
+        for d in sorted(days_map.keys()):
+            scenes = list(set(img["scene"] for img in days_map[d] if img.get("scene")))
+            days_summary.append({"date": d, "photo_count": len(days_map[d]),
+                                  "scenes": ", ".join(scenes[:5]), "locations": None})
+
+        day_names = await generate_trip_narrative(days_summary, album_name)
+
+        # 9. Build preview
+        preview_days = []
+        for d in sorted(days_map.keys()):
+            day_photos = []
+            for img in days_map[d]:
+                day_photos.append({
+                    "id": img["filename"], "filename": img["filename"],
+                    "score": round(img["score"], 1), "scene": img.get("scene", ""),
+                    "enhance_notes": img.get("enhance_notes"), "has_alternatives": img["cluster_size"] > 1,
+                    "enhanced": False, "removed": False, "cluster_idx": img["cluster_idx"],
+                })
+            preview_days.append({
+                "date": d, "day_name": day_names.get(d, d),
+                "photos_found": len([img for img in scored if img["day"] == d]),
+                "photos": day_photos,
+            })
+
+        all_clusters_serializable = []
+        for i, cluster in enumerate(clusters):
+            all_clusters_serializable.append([{
+                "filename": img["filename"], "day": img["day"],
+                "score": img.get("score", img.get("cheap_score", 0)),
+                "flattering": img.get("flattering", True),
+                "scene": img.get("scene", ""), "enhance_notes": img.get("enhance_notes"),
+            } for img in cluster])
+
+        update_job(job_id, status="preview_ready", stage="Preview ready", progress=90,
+                   kept=len(keepers),
+                   preview={"album_name": album_name, "total_found": total_found, "days": preview_days},
+                   all_clusters=all_clusters_serializable, work_dir=str(work_dir))
+
+    except Exception as e:
+        update_job(job_id, status="error", error=str(e))
+        if work_dir.exists(): shutil.rmtree(work_dir)
+    finally:
+        if zip_path.exists(): zip_path.unlink()
