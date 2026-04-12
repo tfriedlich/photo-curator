@@ -21,7 +21,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
 GOOGLE_SCOPES = " ".join([
     "https://www.googleapis.com/auth/photoslibrary.readonly",
-    "https://www.googleapis.com/auth/photoslibrary",
     "https://www.googleapis.com/auth/photoslibrary.appendonly",
 ])
 
