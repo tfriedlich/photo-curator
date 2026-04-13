@@ -400,7 +400,7 @@
 
     loadTripState();
     await checkAuth();
-    await loadAlbumHistory();
+    try { await loadAlbumHistory(); } catch(e) { console.warn('Album history failed:', e); }
   });
 
   // ── Trip state (localStorage) ──
