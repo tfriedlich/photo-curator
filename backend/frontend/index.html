@@ -528,9 +528,9 @@
   function getAlbumName() {
     const select = document.getElementById('album-select');
     if (select && select.value !== '__new__') {
-      return select.options[select.selectedIndex].dataset.name;
+      return select.options[select.selectedIndex]?.dataset?.name || 'Best Of Trip';
     }
-    return getAlbumName() || 'Best Of Trip';
+    return document.getElementById('album-name')?.value?.trim() || 'Best Of Trip';
   }
 
   async function loadAlbumHistory() {
