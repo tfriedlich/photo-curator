@@ -128,7 +128,7 @@ def update_job(job_id: str, **kwargs):
         _get_logger().error(f"Job failed: {kwargs['error']}")
     # Push SSE event
     try:
-        from main import push_job_event
+        from state import push_job_event
         event = {"type": "status"}
         event.update({k: v for k, v in kwargs.items()
                       if k in ("stage", "progress", "total", "kept", "status", "error", "album_url", "album_id")})
@@ -310,7 +310,7 @@ def pick_best_from_cluster(cluster: list, max_keep: int = 1) -> list:
 
 
 # ── Stage 4: Claude Vision scoring ────────────────────────────────────────────
-async def score_with_claude(path: Path) -> dict:
+async def score_with_claude(path: Path, job_id: str = None) -> dict:
     """
     Returns structured scoring including flattering check and scene tags.
     """
@@ -410,7 +410,7 @@ CRITICAL FLATTERING CHECK:
             _get_logger().score(path.name, score_val, scene_val, flattering_val)
             # Push score event with base64 thumbnail for live preview
             try:
-                from main import push_job_event
+                from state import push_job_event
                 import base64 as _b64
                 from PIL import Image as _Img
                 import io as _io
@@ -419,14 +419,8 @@ CRITICAL FLATTERING CHECK:
                 _buf = _io.BytesIO()
                 _thumb.save(_buf, "JPEG", quality=60)
                 _thumb_b64 = _b64.b64encode(_buf.getvalue()).decode()
-                # Find job_id from current job_store entry that owns this path
-                _job_id = next(
-                    (jid for jid, j in job_store.items()
-                     if j.get("status") == "running" and str(path).startswith(str(j.get("work_dir", "NOMATCH")))),
-                    None
-                )
-                if _job_id:
-                    push_job_event(_job_id, {
+                if job_id:
+                    push_job_event(job_id, {
                         "type": "score",
                         "filename": path.name,
                         "score": score_val,
@@ -689,7 +683,7 @@ async def upload_to_google_photos(paths, album_name, access_token,
 
         _get_logger().info(f"Upload complete: {uploaded} succeeded, {failed} failed of {total} total")
 
-    return album_url, album_id, keeper_filenames
+    return album_url, album_id
 
 
 # ── Main pipeline ──────────────────────────────────────────────────────────────
@@ -766,7 +760,7 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
 
         scored = []
         for i, img in enumerate(candidates):
-            result = await score_with_claude(img["path"])
+            result = await score_with_claude(img["path"], job_id=job_id)
             img["claude_result"] = result
             img["score"] = result.get("score", 5.0)
             img["flattering"] = result.get("flattering", True)
@@ -930,7 +924,7 @@ async def confirm_and_upload(job_id, access_token, created_album_ids=None,
         update_job(job_id, status="uploading", stage=stage, progress=92)
         _get_logger().info(f"Starting upload of {len(keeper_paths)} photos", existing_album=bool(existing_album_id), skipped=skipped_dupes)
 
-        album_url, album_id, uploaded_filenames = await upload_to_google_photos(
+        album_url, album_id = await upload_to_google_photos(
             keeper_paths, album_name, access_token,
             existing_album_id, existing_album_url
         )

@@ -767,6 +767,10 @@
 
     if (event.stage) {
       document.getElementById('stage-label').textContent = event.stage;
+      // Show feed panel as soon as scoring begins
+      if (event.stage.includes('AI scoring') || event.stage.includes('scoring')) {
+        document.getElementById('scoring-feed').style.display = 'block';
+      }
       addFeedLog(event.stage);
     }
     if (event.progress !== undefined)
@@ -776,12 +780,10 @@
 
     if (event.type === 'score') {
       feedCount++;
-      if (event.flattering && event.score >= (parseFloat(document.getElementById('min-score-hint')?.value || '6'))) {
-        passCount++;
-      }
+      if (event.flattering && parseFloat(event.score) >= 6.0) passCount++;
       document.getElementById('stat-kept').textContent = feedCount.toLocaleString();
       document.getElementById('stat-pass').textContent = passCount.toLocaleString();
-      document.getElementById('feed-count').textContent = `${feedCount} scored`;
+      document.getElementById('feed-count').textContent = feedCount + ' scored';
       document.getElementById('scoring-feed').style.display = 'block';
       addFeedScore(event);
       return;
@@ -832,7 +834,7 @@
 
   function addFeedLog(msg) {
     // Only show significant stage changes, not every poll
-    const significant = ['Downloading', 'Clustering', 'AI scoring', 'narrative', 'Preview ready', 'Creating album', 'Adding'];
+    const significant = ['Downloading', 'Clustering', 'AI scoring', 'scoring', 'Analyzing', 'narrative', 'Preview ready', 'Creating album', 'Adding', 'Generating'];
     if (!significant.some(s => msg.includes(s))) return;
     const body = document.getElementById('scoring-feed-body');
     if (!body || document.getElementById('scoring-feed').style.display === 'none') return;
