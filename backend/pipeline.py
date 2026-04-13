@@ -478,7 +478,7 @@ CRITICAL FLATTERING CHECK:
 - Only flattering=true if ALL visible people look good"""
 
         payload = {
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-haiku-4-5-20251001",
             "max_tokens": 200,
             "messages": [{"role": "user", "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
@@ -493,8 +493,9 @@ CRITICAL FLATTERING CHECK:
                 json=payload,
             )
             resp_data = r.json()
-            if "error" in resp_data:
-                _get_logger().error(f"Anthropic API error: {resp_data['error'].get('message', str(resp_data['error']))}")
+            if "error" in resp_data or "content" not in resp_data:
+                err_msg = resp_data.get("error", {}).get("message", str(resp_data)) if "error" in resp_data else f"No content key in response: {list(resp_data.keys())}"
+                _get_logger().error(f"Anthropic API error scoring {path.name}: {err_msg}")
                 return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
 
             text = resp_data["content"][0]["text"].strip()
@@ -568,7 +569,7 @@ Respond with ONLY valid JSON mapping date to name, no markdown:
 {{{", ".join(f'"{d["date"]}": "<name>"' for d in days_summary)}}}"""
 
         payload = {
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-6",
             "max_tokens": 500,
             "messages": [{"role": "user", "content": prompt}],
         }
@@ -613,7 +614,7 @@ Context:
 Write a warm, vivid description that captures the spirit of the trip. Sound like a human writing a caption, not a robot. Don't use the word "album". Don't start with "This". Be specific about activities and places if the scene tags suggest them. Keep it under 60 words."""
 
         payload = {
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-6",
             "max_tokens": 150,
             "messages": [{"role": "user", "content": prompt}],
         }

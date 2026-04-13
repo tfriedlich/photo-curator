@@ -354,7 +354,10 @@
         </div>
         <!-- Current photo hero -->
         <div class="score-current" id="score-current">
-          <div class="score-current-thumb-placeholder" id="score-current-thumb-wrap">📷</div>
+          <div id="score-current-thumb-wrap" class="score-current-thumb-placeholder">
+            <img id="score-current-img" class="score-current-thumb" src="" alt="" style="display:none;width:90px;height:90px;object-fit:cover;border-radius:3px;">
+            <span id="score-current-placeholder">📷</span>
+          </div>
           <div class="score-current-body">
             <div class="score-current-label" id="score-current-label">Analyzing...</div>
             <div class="score-current-narrative" id="score-current-narrative"></div>
@@ -875,9 +878,13 @@
       currentEventSource.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data);
+          if (event.type === 'score') console.log('[SSE score]', event.filename, event.score, event.scene);
+          else if (event.type !== 'ping') console.log('[SSE]', event.type, event.stage || event.status || '');
           handlePipelineEvent(event, jobId);
-        } catch(err) {}
+        } catch(err) { console.error('[SSE parse error]', err, e.data?.slice(0,100)); }
       };
+
+      currentEventSource.onopen = () => console.log('[SSE] connected for job', jobId);
 
       currentEventSource.onerror = () => {
         currentEventSource.close();
@@ -993,30 +1000,39 @@
 
     currentEl.classList.add('show');
 
-    // Thumbnail
-    if (event.thumb) {
-      thumbWrap.outerHTML = `<img id="score-current-thumb-wrap" class="score-current-thumb" src="data:image/jpeg;base64,${event.thumb}" alt="">`;
-    } else {
-      const el = document.getElementById('score-current-thumb-wrap');
-      if (el) el.textContent = '📷';
+    // Thumbnail - stable img element, just swap src
+    const img = document.getElementById('score-current-img');
+    const placeholder = document.getElementById('score-current-placeholder');
+    const prevSrc = img ? img.src : '';
+    if (img && event.thumb) {
+      img.src = 'data:image/jpeg;base64,' + event.thumb;
+      img.style.display = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+    } else if (img) {
+      img.style.display = 'none';
+      if (placeholder) placeholder.style.display = '';
     }
 
-    labelEl.textContent = `Photo ${feedCount} of ${document.getElementById('stat-total').textContent || '?'} · ${event.filename}`;
+    const totalShown = document.getElementById('stat-total').textContent;
+    labelEl.textContent = 'Photo ' + feedCount + (totalShown && totalShown !== '—' ? ' of ' + totalShown : '') + ' · ' + event.filename;
     narrativeEl.textContent = narrative;
-    verdictEl.innerHTML = `<span class="score-verdict-badge ${verdictClass}">${verdict}</span>` +
-      (score && verdictClass !== 'unflattering' ? ` <span class="score-verdict-reason">${score.toFixed(1)} / 10</span>` : '');
+    verdictEl.innerHTML = '<span class="score-verdict-badge ' + verdictClass + '">' + verdict + '</span>' +
+      (score > 0 && verdictClass !== 'unflattering' ? ' <span class="score-verdict-reason">' + score.toFixed(1) + ' / 10</span>' : '');
 
-    // Push previous current to history strip
-    const body = document.getElementById('scoring-feed-body');
-    const item = document.createElement('div');
-    item.className = 'score-history-item';
-    const prevThumb = document.getElementById('score-current-thumb-wrap');
-    const thumbHtml = (prevThumb && prevThumb.tagName === 'IMG')
-      ? `<img class="score-history-thumb" src="${prevThumb.src}" alt="">`
-      : `<div class="score-history-thumb-placeholder">📷</div>`;
-    item.innerHTML = `${thumbHtml}<span class="score-history-text">${esc(narrative)}</span><span class="score-history-badge ${verdictClass}">${score > 0 ? score.toFixed(1) : '✕'}</span>`;
-    body.insertBefore(item, body.firstChild);
-    while (body.children.length > 20) body.removeChild(body.lastChild);
+    // Push previous to history strip (before updating hero)
+    if (feedCount > 1 && narrativeEl.textContent) {
+      const body = document.getElementById('scoring-feed-body');
+      const item = document.createElement('div');
+      item.className = 'score-history-item';
+      const histThumb = prevSrc && prevSrc.startsWith('data:')
+        ? '<img class="score-history-thumb" src="' + prevSrc + '" alt="">'
+        : '<div class="score-history-thumb-placeholder">📷</div>';
+      item.innerHTML = histThumb +
+        '<span class="score-history-text">' + esc(narrative) + '</span>' +
+        '<span class="score-history-badge ' + verdictClass + '">' + (score > 0 ? score.toFixed(1) : '✕') + '</span>';
+      body.insertBefore(item, body.firstChild);
+      while (body.children.length > 20) body.removeChild(body.lastChild);
+    }
   }
 
   function addFeedLog(msg) {
