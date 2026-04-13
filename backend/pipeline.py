@@ -15,8 +15,29 @@ WORK_DIR = Path("/tmp/photo-curator/jobs")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"}
 GOOGLE_PHOTOS_PAGE_SIZE = 100
 
+
+def _get_logger():
+    """Get the app logger if available, else return a no-op logger."""
+    try:
+        from main import logger
+        return logger
+    except Exception:
+        class _Noop:
+            def info(self, *a, **k): pass
+            def warn(self, *a, **k): pass
+            def error(self, *a, **k): pass
+            def score(self, *a, **k): pass
+        return _Noop()
+
+
 def update_job(job_id: str, **kwargs):
-    job_store[job_id].update(kwargs)
+    if job_id in job_store:
+        job_store[job_id].update(kwargs)
+    if "stage" in kwargs:
+        print(f"[JOB] {kwargs['stage']}", flush=True)
+        _get_logger().info(f"[JOB] {kwargs['stage']}")
+    if kwargs.get("status") == "error" and "error" in kwargs:
+        _get_logger().error(f"Job failed: {kwargs['error']}")
 
 
 # ── Stage 1: Fetch from Google Photos ─────────────────────────────────────────
