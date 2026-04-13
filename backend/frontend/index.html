@@ -256,10 +256,19 @@
         <div id="albums-list"></div>
       </div>
 
-      <!-- Album name (only shown for new trips) -->
+      <!-- Album selector: pick existing curated album or type new name -->
       <div class="field" id="album-name-field">
         <span class="slabel">Album name</span>
-        <input type="text" id="album-name" value="Best Of Trip" placeholder="e.g. Costa Rica · April 2026"/>
+        <div class="album-select-wrap">
+          <select class="album-select" id="album-select" onchange="handleAlbumSelect()">
+            <option value="__new__">+ New album...</option>
+          </select>
+          <span class="album-select-arrow">▼</span>
+        </div>
+        <div class="album-new-row show" id="album-new-row">
+          <input class="album-input" id="album-name" type="text" placeholder="e.g. Costa Rica · April 2026" value="Best Of Trip" style="margin:0;flex:1;"/>
+        </div>
+        <div class="album-existing-meta" id="album-existing-meta"></div>
       </div>
 
       <!-- Method tabs -->
@@ -432,6 +441,7 @@
     loadTripState();
     await checkAuth();
     try { await loadAlbumHistory(); } catch(e) { console.warn('Album history failed:', e); }
+    try { await populateAlbumSelector(); } catch(e) {}
   });
 
   // ── Trip state (localStorage) ──
@@ -443,6 +453,76 @@
         showTripBanner();
       }
     } catch(e) {}
+  }
+
+  async function populateAlbumSelector() {
+    const select = document.getElementById('album-select');
+    if (!select) return;
+    try {
+      const r = await fetch(`${API}/api/albums`);
+      if (!r.ok) return;
+      const { albums } = await r.json();
+      // Keep the "New album..." option, add curated albums
+      const curated = albums.filter(a => a.type === 'curated' || !a.type);
+      curated.forEach(album => {
+        const opt = document.createElement('option');
+        opt.value = album.album_id;
+        opt.dataset.name = album.album_name;
+        opt.dataset.url = album.album_url || '';
+        opt.dataset.count = album.photos_count || 0;
+        opt.dataset.sessions = album.tranches_count || 0;
+        opt.textContent = album.album_name;
+        select.appendChild(opt);
+      });
+      // If there's an active trip in localStorage, pre-select it
+      if (tripState?.albumId) {
+        const match = [...select.options].find(o => o.value === tripState.albumId);
+        if (match) {
+          select.value = tripState.albumId;
+          handleAlbumSelect();
+        }
+      }
+    } catch(e) {}
+  }
+
+  function handleAlbumSelect() {
+    const select = document.getElementById('album-select');
+    const newRow = document.getElementById('album-new-row');
+    const meta = document.getElementById('album-existing-meta');
+    const selected = select.options[select.selectedIndex];
+
+    if (select.value === '__new__') {
+      newRow.classList.add('show');
+      meta.classList.remove('show');
+      meta.textContent = '';
+      // Clear any active trip state when choosing new
+      if (tripState && !document.getElementById('trip-banner')?.style?.display?.includes('none')) {
+        // keep trip state in case they change their mind
+      }
+    } else {
+      newRow.classList.remove('show');
+      const count = selected.dataset.count;
+      const sessions = selected.dataset.sessions;
+      meta.textContent = `${count} photos · ${sessions} session${sessions != 1 ? 's' : ''} · adding a new session`;
+      meta.classList.add('show');
+      // Pre-populate trip state for this album
+      tripState = {
+        albumId: select.value,
+        albumUrl: selected.dataset.url,
+        albumName: selected.dataset.name,
+        tranchesAdded: parseInt(sessions) || 0,
+        totalKept: parseInt(count) || 0,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
+    }
+  }
+
+  function getAlbumName() {
+    const select = document.getElementById('album-select');
+    if (select && select.value !== '__new__') {
+      return select.options[select.selectedIndex].dataset.name;
+    }
+    return getAlbumName() || 'Best Of Trip';
   }
 
   async function loadAlbumHistory() {
@@ -524,7 +604,12 @@
     document.getElementById('trip-name-display').textContent = tripState.albumName;
     document.getElementById('trip-meta-display').textContent =
       `${tripState.tranchesAdded} day${tripState.tranchesAdded !== 1 ? 's' : ''} curated · ${tripState.totalKept} photos added · tap to continue`;
-    document.getElementById('album-name-field').style.display = 'none';
+    // Update combo to show active album
+    const sel = document.getElementById('album-select');
+    if (sel && tripState?.albumId) {
+      const match = [...sel.options].find(o => o.value === tripState.albumId);
+      if (match) { sel.value = tripState.albumId; handleAlbumSelect(); }
+    }
     document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
   }
 
@@ -538,7 +623,8 @@
     if (confirm(`Start a new album? This will archive "${tripState.albumName}".`)) {
       clearTripState();
       document.getElementById('trip-banner').classList.remove('show');
-      document.getElementById('album-name-field').style.display = 'block';
+      const sel = document.getElementById('album-select');
+      if (sel) { sel.value = '__new__'; handleAlbumSelect(); }
       document.getElementById('confirm-btn-label').textContent = 'Create Album →';
     }
   }
@@ -668,7 +754,7 @@
   }
 
   async function startPickerCurate(sessionId) {
-    const albumName = tripState ? tripState.albumName : (document.getElementById('album-name').value.trim() || 'Best Of Trip');
+    const albumName = tripState ? tripState.albumName : (getAlbumName() || 'Best Of Trip');
     showSection('progress');
     try {
       const r = await fetch(`${API}/api/picker/curate?session_id=${encodeURIComponent(sessionId)}&album_name=${encodeURIComponent(albumName)}`, { method: 'POST' });
@@ -702,7 +788,7 @@
 
   async function startZipUpload() {
     if (!selectedFile) return;
-    const albumName = tripState ? tripState.albumName : (document.getElementById('album-name').value.trim() || 'Best Of Trip');
+    const albumName = tripState ? tripState.albumName : (getAlbumName() || 'Best Of Trip');
     document.getElementById('zip-submit-btn').disabled = true;
     showSection('progress');
 

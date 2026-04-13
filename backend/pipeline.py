@@ -18,12 +18,56 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"}
 GOOGLE_PHOTOS_PAGE_SIZE = 100
 
 
+def _parse_manifest(manifest_path):
+    """Parse a manifest file into (meta_dict, filenames_set)."""
+    meta, filenames = {}, set()
+    for line in manifest_path.read_text().splitlines():
+        if line.startswith("#"):
+            try:
+                key, val = line[1:].strip().split("=", 1)
+                meta[key.strip()] = val.strip()
+            except Exception:
+                pass
+        elif line.strip():
+            filenames.add(line.strip())
+    return meta, filenames
+
+
 def get_album_manifest(album_id: str) -> set:
     """Return set of filenames already uploaded to this album."""
     manifest_path = MANIFEST_DIR / f"{album_id}.txt"
     if not manifest_path.exists():
         return set()
-    return set(manifest_path.read_text().splitlines())
+    _, filenames = _parse_manifest(manifest_path)
+    return filenames
+
+
+def get_all_album_manifests() -> list:
+    """Return list of all known albums with rich metadata, newest first."""
+    albums = []
+    for manifest_path in sorted(MANIFEST_DIR.glob("*.txt"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            album_id = manifest_path.stem
+            meta, filenames = _parse_manifest(manifest_path)
+            albums.append({
+                "album_id": album_id,
+                "album_name": meta.get("name", "Unknown Album"),
+                "album_url": meta.get("url", ""),
+                "photos_count": len(filenames),
+                "tranches_count": int(meta.get("tranches", 0)),
+                "last_updated": meta.get("last_updated", ""),
+                "created": meta.get("created", ""),
+                "date_range_start": meta.get("date_range_start", ""),
+                "date_range_end": meta.get("date_range_end", ""),
+                "scenes": [s for s in meta.get("scenes", "").split(",") if s.strip()],
+                "avg_score": float(meta.get("avg_score", 0) or 0),
+                "cover_url": meta.get("cover_url", ""),
+                "narrative": meta.get("narrative", ""),
+                "type": meta.get("type", "curated"),
+            })
+        except Exception as e:
+            pass  # Skip corrupt manifests
+    return albums
 
 
 def create_linked_album(album_url: str, album_name: str, description: str = "") -> dict:
@@ -92,15 +136,70 @@ def delete_album_manifest(album_id: str) -> dict:
     return {"ok": True}
 
 
-def update_album_manifest(album_id: str, filenames: list):
-    """Append newly uploaded filenames to the album manifest."""
+def update_album_manifest(album_id: str, album_name: str = "", album_url: str = "",
+                           filenames: list = None, scenes: list = None, scores: list = None,
+                           date_range: tuple = (None, None), cover_url: str = "",
+                           narrative: str = ""):
+    """Append newly uploaded filenames and update album metadata."""
+    import datetime
+    filenames = filenames or []
     manifest_path = MANIFEST_DIR / f"{album_id}.txt"
-    existing = get_album_manifest(album_id)
-    new_entries = [f for f in filenames if f not in existing]
+    existing_meta, existing_files = {}, set()
+    if manifest_path.exists():
+        existing_meta, existing_files = _parse_manifest(manifest_path)
+
+    new_entries = [f for f in filenames if f not in existing_files]
+
+    # Update metadata
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    if album_name:
+        existing_meta["name"] = album_name
+    if album_url:
+        existing_meta["url"] = album_url
+    existing_meta["last_updated"] = now
+    if "created" not in existing_meta:
+        existing_meta["created"] = now
     if new_entries:
-        with open(manifest_path, "a") as f:
-            f.write("\n".join(new_entries) + "\n")
-        _get_logger().info(f"Manifest updated: {len(new_entries)} new, {len(existing) + len(new_entries)} total", album_id=album_id)
+        existing_meta["tranches"] = str(int(existing_meta.get("tranches", 0)) + 1)
+
+    # Accumulate scenes
+    if scenes:
+        existing_scenes = set(s.strip() for s in existing_meta.get("scenes", "").split(",") if s.strip())
+        existing_scenes.update(s.strip() for s in scenes if s.strip())
+        existing_meta["scenes"] = ",".join(sorted(existing_scenes)[:30])
+
+    # Rolling average score
+    if scores:
+        new_avg = sum(scores) / len(scores)
+        old_avg = float(existing_meta.get("avg_score", 0) or 0)
+        old_count = max(int(existing_meta.get("tranches", 1)), 1)
+        blended = ((old_avg * (old_count - 1)) + new_avg) / old_count
+        existing_meta["avg_score"] = f"{blended:.1f}"
+
+    # Date range -- expand to cover all sessions
+    if date_range[0]:
+        existing_start = existing_meta.get("date_range_start", date_range[0])
+        existing_end = existing_meta.get("date_range_end", date_range[1] or date_range[0])
+        existing_meta["date_range_start"] = min(existing_start, date_range[0])
+        existing_meta["date_range_end"] = max(existing_end, date_range[1] or date_range[0])
+
+    # Cover URL (first session wins)
+    if cover_url and not existing_meta.get("cover_url"):
+        existing_meta["cover_url"] = cover_url
+
+    # Narrative overwrites with latest full-context version
+    if narrative:
+        existing_meta["narrative"] = narrative.replace("\n", " ")
+
+    # Rewrite file
+    all_files = existing_files | set(new_entries)
+    with open(manifest_path, "w") as f:
+        for key, val in existing_meta.items():
+            f.write(f"# {key}={val}\n")
+        for fname in sorted(all_files):
+            f.write(fname + "\n")
+
+    _get_logger().info(f"Manifest updated: {len(new_entries)} new, {len(all_files)} total", album_id=album_id)
     return len(new_entries)
 
 
