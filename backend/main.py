@@ -15,7 +15,7 @@ import config
 from pipeline import run_pipeline, confirm_and_upload, enhance_photo, pick_best_from_cluster
 from state import job_store
 
-APP_VERSION = "v24m"
+APP_VERSION = "v24n"
 
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -48,7 +48,7 @@ class AppLogger:
             "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "level": level,
             "msg": msg,
-            "v": "v24m",
+            "v": "v24n",
         }
         if context:
             entry["ctx"] = context
@@ -611,20 +611,47 @@ async def stream_job(job_id: str):
     queue = get_job_queue(job_id)
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        # Send any existing job state immediately
+        import json as _json
+
+        # Send current job status immediately on connect
         if job_id in job_store:
             job = job_store[job_id]
-            init_data = {"type": "status", "stage": job.get("stage", ""), "progress": job.get("progress", 0), "total": job.get("total", 0)}
-            yield "data: " + json.dumps(init_data) + "\n\n"
+            init_data = {"type": "status", "stage": job.get("stage", ""), "progress": job.get("progress", 0), "total": job.get("total", 0), "status": job.get("status", "")}
+            yield "data: " + _json.dumps(init_data) + "\n\n"
 
+        # Drain any already-queued events (score events that arrived before SSE connected)
+        drained = 0
+        while not queue.empty() and drained < 400:
+            try:
+                event = queue.get_nowait()
+                yield "data: " + _json.dumps(event) + "\n\n"
+                drained += 1
+                if event.get("type") in ("done", "error", "preview_ready"):
+                    return
+            except Exception:
+                break
+
+        # Check if job already finished before we connected
+        if job_id in job_store:
+            status = job_store[job_id].get("status", "")
+            if status in ("done", "preview_ready", "error"):
+                done_data = {"type": status, "status": status}
+                done_data.update({k: job_store[job_id].get(k, "") for k in ("album_url", "album_id", "kept", "error", "stage")})
+                yield "data: " + _json.dumps(done_data) + "\n\n"
+                return
+
+        # Stream live events
         while True:
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                yield "data: " + json.dumps(event) + "\n\n"
+                yield "data: " + _json.dumps(event) + "\n\n"
                 if event.get("type") in ("done", "error", "preview_ready"):
                     break
             except asyncio.TimeoutError:
                 yield 'data: {"type": "ping"}\n\n'
+                # Check if job died without sending terminal event
+                if job_id in job_store and job_store[job_id].get("status") in ("done", "preview_ready", "error"):
+                    break
             except Exception:
                 break
 

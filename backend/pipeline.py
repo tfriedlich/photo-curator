@@ -529,8 +529,8 @@ CRITICAL FLATTERING CHECK:
                         "unflattering_reason": result.get("unflattering_reason", ""),
                         "thumb": _thumb_b64,
                     })
-            except Exception:
-                pass
+            except Exception as _push_err:
+                _get_logger().error(f"Score event push failed for {path.name}: {_push_err}")
             return result
     except Exception as e:
         _get_logger().error(f'Exception scoring {path.name}: {e}')

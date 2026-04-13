@@ -281,7 +281,6 @@
           <select class="album-select" id="album-select">
             <option value="__new__">+ New album...</option>
           </select>
-          <span class="album-select-arrow">▼</span>
         </div>
         <div class="album-new-row show" id="album-new-row">
           <input class="album-input" id="album-name" type="text" placeholder="e.g. Costa Rica · April 2026" value="Best Of Trip"/>
@@ -642,7 +641,7 @@
     document.getElementById('trip-banner').classList.add('show');
     document.getElementById('trip-name-display').textContent = tripState.albumName;
     document.getElementById('trip-meta-display').textContent =
-      `${tripState.tranchesAdded} day${tripState.tranchesAdded !== 1 ? 's' : ''} curated · ${tripState.totalKept} photos added · tap to continue`;
+      `${tripState.tranchesAdded} session${tripState.tranchesAdded !== 1 ? 's' : ''} · ${tripState.totalKept} photos added · tap to continue`;
     // Update combo to show active album (no handleAlbumSelect to avoid recursion)
     const sel = document.getElementById('album-select');
     if (sel && tripState?.albumId) {

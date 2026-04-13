@@ -14,10 +14,17 @@ def get_job_queue(job_id: str) -> asyncio.Queue:
 
 def push_job_event(job_id: str, event: dict):
     """Push an event to the job's SSE queue (non-blocking, best-effort)."""
-    if job_id in job_event_queues:
+    if job_id not in job_event_queues:
+        # Queue doesn't exist yet -- create it so events aren't lost if SSE connects late
+        job_event_queues[job_id] = asyncio.Queue(maxsize=500)
+    try:
+        job_event_queues[job_id].put_nowait(event)
+    except asyncio.QueueFull:
+        # Drop oldest item to make room
         try:
+            job_event_queues[job_id].get_nowait()
             job_event_queues[job_id].put_nowait(event)
-        except asyncio.QueueFull:
-            pass
         except Exception:
             pass
+    except Exception:
+        pass
