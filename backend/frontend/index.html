@@ -266,7 +266,7 @@
           <span class="album-select-arrow">▼</span>
         </div>
         <div class="album-new-row show" id="album-new-row">
-          <input class="album-input" id="album-name" type="text" placeholder="e.g. Costa Rica · April 2026" value="Best Of Trip" style="margin:0;flex:1;"/>
+          <input class="album-input" id="album-name" type="text" placeholder="e.g. Costa Rica · April 2026" value="Best Of Trip"/>
         </div>
         <div class="album-existing-meta" id="album-existing-meta"></div>
       </div>
@@ -485,35 +485,40 @@
     } catch(e) {}
   }
 
+  let _handlingAlbumSelect = false;
   function handleAlbumSelect() {
-    const select = document.getElementById('album-select');
-    const newRow = document.getElementById('album-new-row');
-    const meta = document.getElementById('album-existing-meta');
-    const selected = select.options[select.selectedIndex];
+    if (_handlingAlbumSelect) return;
+    _handlingAlbumSelect = true;
+    try {
+      const select = document.getElementById('album-select');
+      if (!select) return;
+      const newRow = document.getElementById('album-new-row');
+      const meta = document.getElementById('album-existing-meta');
+      const selected = select.options[select.selectedIndex];
 
-    if (select.value === '__new__') {
-      newRow.classList.add('show');
-      meta.classList.remove('show');
-      meta.textContent = '';
-      // Clear any active trip state when choosing new
-      if (tripState && !document.getElementById('trip-banner')?.style?.display?.includes('none')) {
-        // keep trip state in case they change their mind
+      if (select.value === '__new__') {
+        if (newRow) newRow.classList.add('show');
+        if (meta) { meta.classList.remove('show'); meta.textContent = ''; }
+      } else {
+        if (newRow) newRow.classList.remove('show');
+        const count = selected.dataset.count || '0';
+        const sessions = selected.dataset.sessions || '0';
+        if (meta) {
+          meta.textContent = count + ' photos · ' + sessions + ' session' + (sessions != 1 ? 's' : '') + ' · adding a new session';
+          meta.classList.add('show');
+        }
+        // Update trip state silently (no showTripBanner call to avoid recursion)
+        tripState = {
+          albumId: select.value,
+          albumUrl: selected.dataset.url || '',
+          albumName: selected.dataset.name || '',
+          tranchesAdded: parseInt(sessions) || 0,
+          totalKept: parseInt(count) || 0,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
       }
-    } else {
-      newRow.classList.remove('show');
-      const count = selected.dataset.count;
-      const sessions = selected.dataset.sessions;
-      meta.textContent = `${count} photos · ${sessions} session${sessions != 1 ? 's' : ''} · adding a new session`;
-      meta.classList.add('show');
-      // Pre-populate trip state for this album
-      tripState = {
-        albumId: select.value,
-        albumUrl: selected.dataset.url,
-        albumName: selected.dataset.name,
-        tranchesAdded: parseInt(sessions) || 0,
-        totalKept: parseInt(count) || 0,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
+    } finally {
+      _handlingAlbumSelect = false;
     }
   }
 
@@ -604,11 +609,20 @@
     document.getElementById('trip-name-display').textContent = tripState.albumName;
     document.getElementById('trip-meta-display').textContent =
       `${tripState.tranchesAdded} day${tripState.tranchesAdded !== 1 ? 's' : ''} curated · ${tripState.totalKept} photos added · tap to continue`;
-    // Update combo to show active album
+    // Update combo to show active album (no handleAlbumSelect to avoid recursion)
     const sel = document.getElementById('album-select');
     if (sel && tripState?.albumId) {
       const match = [...sel.options].find(o => o.value === tripState.albumId);
-      if (match) { sel.value = tripState.albumId; handleAlbumSelect(); }
+      if (match) {
+        sel.value = tripState.albumId;
+        const newRow = document.getElementById('album-new-row');
+        const meta = document.getElementById('album-existing-meta');
+        if (newRow) newRow.classList.remove('show');
+        if (meta) {
+          meta.textContent = (tripState.totalKept||0) + ' photos · ' + (tripState.tranchesAdded||0) + ' sessions · adding a new session';
+          meta.classList.add('show');
+        }
+      }
     }
     document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
   }
@@ -624,7 +638,13 @@
       clearTripState();
       document.getElementById('trip-banner').classList.remove('show');
       const sel = document.getElementById('album-select');
-      if (sel) { sel.value = '__new__'; handleAlbumSelect(); }
+      if (sel) {
+        sel.value = '__new__';
+        const newRow = document.getElementById('album-new-row');
+        const meta = document.getElementById('album-existing-meta');
+        if (newRow) newRow.classList.add('show');
+        if (meta) { meta.classList.remove('show'); meta.textContent = ''; }
+      }
       document.getElementById('confirm-btn-label').textContent = 'Create Album →';
     }
   }
