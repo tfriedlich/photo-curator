@@ -15,7 +15,7 @@ import config
 from pipeline import run_pipeline, confirm_and_upload, enhance_photo, pick_best_from_cluster
 from state import job_store
 
-APP_VERSION = "v24"
+APP_VERSION = "v24i"
 
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -48,7 +48,7 @@ class AppLogger:
             "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "level": level,
             "msg": msg,
-            "v": "v24",
+            "v": "v24i",
         }
         if context:
             entry["ctx"] = context

@@ -260,7 +260,7 @@
       <div class="field" id="album-name-field">
         <span class="slabel">Album name</span>
         <div class="album-select-wrap">
-          <select class="album-select" id="album-select" onchange="handleAlbumSelect()">
+          <select class="album-select" id="album-select">
             <option value="__new__">+ New album...</option>
           </select>
           <span class="album-select-arrow">▼</span>
@@ -462,8 +462,9 @@
       const r = await fetch(`${API}/api/albums`);
       if (!r.ok) return;
       const { albums } = await r.json();
-      // Keep the "New album..." option, add curated albums
       const curated = albums.filter(a => a.type === 'curated' || !a.type);
+      // Build options in a fragment -- no DOM events fired until appended
+      const frag = document.createDocumentFragment();
       curated.forEach(album => {
         const opt = document.createElement('option');
         opt.value = album.album_id;
@@ -472,54 +473,56 @@
         opt.dataset.count = album.photos_count || 0;
         opt.dataset.sessions = album.tranches_count || 0;
         opt.textContent = album.album_name;
-        select.appendChild(opt);
+        frag.appendChild(opt);
       });
-      // If there's an active trip in localStorage, pre-select it
+      select.appendChild(frag);
+      // Pre-select active album without triggering change event
       if (tripState?.albumId) {
         const match = [...select.options].find(o => o.value === tripState.albumId);
         if (match) {
           select.value = tripState.albumId;
-          handleAlbumSelect();
+          _applyAlbumSelection(select);  // direct, no event
         }
       }
     } catch(e) {}
   }
 
-  let _handlingAlbumSelect = false;
-  function handleAlbumSelect() {
-    if (_handlingAlbumSelect) return;
-    _handlingAlbumSelect = true;
-    try {
-      const select = document.getElementById('album-select');
-      if (!select) return;
-      const newRow = document.getElementById('album-new-row');
-      const meta = document.getElementById('album-existing-meta');
-      const selected = select.options[select.selectedIndex];
+  // Wire up change event once, here
+  document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('album-select');
+    if (sel) sel.addEventListener('change', handleAlbumSelect);
+  });
 
-      if (select.value === '__new__') {
-        if (newRow) newRow.classList.add('show');
-        if (meta) { meta.classList.remove('show'); meta.textContent = ''; }
-      } else {
-        if (newRow) newRow.classList.remove('show');
-        const count = selected.dataset.count || '0';
-        const sessions = selected.dataset.sessions || '0';
-        if (meta) {
-          meta.textContent = count + ' photos · ' + sessions + ' session' + (sessions != 1 ? 's' : '') + ' · adding a new session';
-          meta.classList.add('show');
-        }
-        // Update trip state silently (no showTripBanner call to avoid recursion)
-        tripState = {
-          albumId: select.value,
-          albumUrl: selected.dataset.url || '',
-          albumName: selected.dataset.name || '',
-          tranchesAdded: parseInt(sessions) || 0,
-          totalKept: parseInt(count) || 0,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
+  function _applyAlbumSelection(select) {
+    const newRow = document.getElementById('album-new-row');
+    const meta = document.getElementById('album-existing-meta');
+    if (!select) return;
+    const selected = select.options[select.selectedIndex];
+    if (select.value === '__new__') {
+      if (newRow) newRow.classList.add('show');
+      if (meta) { meta.classList.remove('show'); meta.textContent = ''; }
+    } else {
+      if (newRow) newRow.classList.remove('show');
+      const count = (selected && selected.dataset.count) || '0';
+      const sessions = (selected && selected.dataset.sessions) || '0';
+      if (meta) {
+        meta.textContent = count + ' photos · ' + sessions + ' session' + (sessions != 1 ? 's' : '') + ' · adding a new session';
+        meta.classList.add('show');
       }
-    } finally {
-      _handlingAlbumSelect = false;
+      tripState = {
+        albumId: select.value,
+        albumUrl: (selected && selected.dataset.url) || '',
+        albumName: (selected && selected.dataset.name) || '',
+        tranchesAdded: parseInt(sessions) || 0,
+        totalKept: parseInt(count) || 0,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
     }
+  }
+
+  function handleAlbumSelect() {
+    const select = document.getElementById('album-select');
+    _applyAlbumSelection(select);
   }
 
   function getAlbumName() {
