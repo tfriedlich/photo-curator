@@ -254,7 +254,14 @@ async def upload_zip(
 async def get_status(job_id: str):
     if job_id not in job_store: raise HTTPException(404, "Job not found")
     job = job_store[job_id]
-    return {k: v for k, v in job.items() if k not in ("preview", "all_clusters", "work_dir")}
+    return {k: v for k, v in job.items() if k not in ("preview", "all_clusters", "work_dir", "picker_ids")}
+
+
+@app.get("/api/status/{job_id}/picker-ids")
+async def get_picker_ids(job_id: str):
+    """Return picker media item IDs for this job -- used by frontend to track uploaded photos."""
+    if job_id not in job_store: raise HTTPException(404, "Job not found")
+    return {"picker_ids": job_store[job_id].get("picker_ids", [])}
 
 
 @app.get("/api/preview/{job_id}")
@@ -286,7 +293,7 @@ class PhotoAction(BaseModel):
 async def remove_photo(job_id: str, action: PhotoAction):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
-    for day in job["preview"]["days"]:
+    for day in job["preview"]["tranches"]:
         if day["date"] == action.day:
             for photo in day["photos"]:
                 if photo["id"] == action.photo_id:
@@ -300,7 +307,7 @@ async def swap_photo(job_id: str, action: PhotoAction):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     target_photo = None
-    for day in job["preview"]["days"]:
+    for day in job["preview"]["tranches"]:
         if day["date"] == action.day:
             for photo in day["photos"]:
                 if photo["id"] == action.photo_id:
@@ -311,7 +318,7 @@ async def swap_photo(job_id: str, action: PhotoAction):
     if cluster_idx is None: raise HTTPException(400, "No cluster info")
     cluster = job["all_clusters"][cluster_idx]
     if len(cluster) <= 1: raise HTTPException(400, "No alternatives available")
-    current_ids = {p["id"] for day in job["preview"]["days"] for p in day["photos"]}
+    current_ids = {p["id"] for day in job["preview"]["tranches"] for p in day["photos"]}
     alternatives = [c for c in cluster[1:] if c["filename"] not in current_ids and c.get("flattering", True)]
     if not alternatives: raise HTTPException(400, "No flattering alternatives available")
     next_best = alternatives[0]
@@ -343,7 +350,7 @@ async def enhance_photo_endpoint(job_id: str, action: PhotoAction):
     if job_id not in job_store: raise HTTPException(404)
     job = job_store[job_id]
     target_photo = None
-    for day in job["preview"]["days"]:
+    for day in job["preview"]["tranches"]:
         if day["date"] == action.day:
             for photo in day["photos"]:
                 if photo["id"] == action.photo_id:
@@ -378,20 +385,21 @@ async def adjust_ratio(job_id: str, req: RatioRequest):
     ratio = max(0.05, min(0.50, req.ratio))
     total = job["preview"]["total_found"]
     target = max(10, int(total * ratio))
-    all_photos = [p for day in job["preview"]["days"] for p in day["photos"]]
+    all_photos = [p for day in job["preview"]["tranches"] for p in day["photos"]]
     all_photos.sort(key=lambda p: p["score"], reverse=True)
     keep_ids = {p["id"] for p in all_photos[:target]}
-    for day in job["preview"]["days"]:
+    for day in job["preview"]["tranches"]:
         for photo in day["photos"]:
             if not photo.get("manually_kept") and not photo.get("manually_removed"):
                 photo["removed"] = photo["id"] not in keep_ids
-    kept = sum(1 for day in job["preview"]["days"] for p in day["photos"] if not p.get("removed"))
+    kept = sum(1 for day in job["preview"]["tranches"] for p in day["photos"] if not p.get("removed"))
     return {"ok": True, "kept": kept}
 
 
 class ConfirmRequest(BaseModel):
     existing_album_id: str = ""
     existing_album_url: str = ""
+    already_uploaded_ids: list = []  # Picker IDs already in the album from previous days
 
 @app.post("/api/confirm/{job_id}")
 async def confirm_album(job_id: str, req: ConfirmRequest, background_tasks: BackgroundTasks):
@@ -403,6 +411,7 @@ async def confirm_album(job_id: str, req: ConfirmRequest, background_tasks: Back
         confirm_and_upload, job_id, access_token, created_album_ids,
         req.existing_album_id or None,
         req.existing_album_url or None,
+        req.already_uploaded_ids or [],
     )
     return {"ok": True}
 
@@ -519,12 +528,80 @@ async def log_frontend(entry: FrontendLogEntry):
     return {"ok": True}
 
 
+@app.get("/api/albums")
+async def get_albums():
+    """Return all albums (curated and linked) from manifests."""
+    from pipeline import get_all_album_manifests
+    albums = get_all_album_manifests()
+    return {"albums": albums}
+
+
+class LinkedAlbumRequest(BaseModel):
+    album_url: str
+    album_name: str
+    description: str = ""
+    cover_url: str = ""
+
+
+@app.post("/api/albums/link")
+async def link_album(req: LinkedAlbumRequest):
+    """Manually link an existing Google Photos album."""
+    from pipeline import create_linked_album
+    if not req.album_url.startswith("https://photos.google.com"):
+        raise HTTPException(400, "Must be a Google Photos URL")
+    result = create_linked_album(req.album_url, req.album_name, req.description)
+    if "error" in result:
+        raise HTTPException(409, result["error"])
+    return result
+
+
+class UpdateAlbumRequest(BaseModel):
+    album_name: str = ""
+    description: str = ""
+    cover_url: str = ""
+
+
+@app.patch("/api/albums/{album_id}")
+async def update_album(album_id: str, req: UpdateAlbumRequest):
+    """Update metadata for a linked album."""
+    from pipeline import update_linked_album
+    result = update_linked_album(
+        album_id,
+        album_name=req.album_name or None,
+        description=req.description or None,
+        cover_url=req.cover_url or None,
+    )
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return result
+
+
+@app.delete("/api/albums/{album_id}")
+async def delete_album(album_id: str):
+    """Remove an album from the browse page (does not delete from Google Photos)."""
+    from pipeline import delete_album_manifest
+    result = delete_album_manifest(album_id)
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return result
+
+
 @app.get("/api/health")
 async def health():
     return {"ok": True}
 
 
+from fastapi.responses import HTMLResponse
+
 FRONTEND_DIR = Path(__file__).parent / "frontend"
+
+@app.get("/browse", response_class=HTMLResponse)
+async def browse_page():
+    browse_path = FRONTEND_DIR / "browse.html"
+    if browse_path.exists():
+        return HTMLResponse(browse_path.read_text())
+    return HTMLResponse("<h1>Browse page not found</h1>", status_code=404)
+
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
@@ -694,7 +771,7 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
 
         update_job(job_id, status="preview_ready", stage="Preview ready", progress=90,
                    kept=len(keepers),
-                   preview={"album_name": album_name, "total_found": total_found, "days": preview_days},
+                   preview={"album_name": album_name, "total_found": total_found, "tranches": preview_days},
                    all_clusters=all_clusters_serializable, work_dir=str(work_dir))
 
     except Exception as e:
@@ -784,14 +861,16 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
                             if idx % 25 == 0:
                                 pct = 10 + int((idx / total_found) * 22)
                                 update_job(job_id, stage=f"Downloading photos ({idx}/{total_found})", progress=pct)
-                            return dest
+                            return dest, item.get("id", "")
                 except Exception:
                     pass
-                return None
+                return None, ""
 
         tasks = [download_one(item, i) for i, item in enumerate(items)]
         results = await asyncio.gather(*tasks)
-        image_paths = [p for p in results if p is not None]
+        # Store picker ID → path mapping for dedup checking
+        picker_id_map = {picker_id: path for path, picker_id in results if path is not None and picker_id}
+        image_paths = [path for path, _ in results if path is not None]
 
         if not image_paths:
             update_job(job_id, status="error", error="Failed to download any photos")
@@ -924,10 +1003,19 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
         except Exception:
             pass
 
+        # Store picker IDs so frontend can track what's already been uploaded
+        # picker_id_map: picker_id -> path; we need filename -> picker_id for dedup
+        filename_to_picker_id = {}
+        if 'picker_id_map' in locals():
+            filename_to_picker_id = {path.name: pid for pid, path in picker_id_map.items()}
+
         update_job(job_id, status="preview_ready", stage="Preview ready", progress=90,
                    kept=len(keepers),
-                   preview={"album_name": album_name, "total_found": total_found, "days": preview_days},
-                   all_clusters=all_clusters_serializable, work_dir=str(work_dir))
+                   picker_ids=list(filename_to_picker_id.values()),
+                   preview={"album_name": album_name, "total_found": total_found, "tranches": preview_days},
+                   all_clusters=all_clusters_serializable,
+                   picker_id_map=filename_to_picker_id,
+                   work_dir=str(work_dir))
 
     except Exception as e:
         update_job(job_id, status="error", error=str(e))

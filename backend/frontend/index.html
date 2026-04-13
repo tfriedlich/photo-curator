@@ -181,6 +181,14 @@
 
     .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 20px; border-radius: 3px; font-size: 12px; font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 1000; }
     .toast.show { opacity: 1; }
+    .album-history-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 3px; margin-bottom: 8px; background: var(--paper); cursor: pointer; transition: background 0.15s; }
+    .album-history-item:hover { background: var(--cream); }
+    .album-history-item.active { border-color: var(--amber); background: var(--amber-pale); }
+    .album-history-icon { font-size: 18px; flex-shrink: 0; }
+    .album-history-info { flex: 1; min-width: 0; }
+    .album-history-name { font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .album-history-meta { font-size: 10px; color: var(--muted); font-family: "DM Mono", monospace; margin-top: 2px; }
+    .album-history-action { font-size: 11px; color: var(--amber); font-weight: 500; white-space: nowrap; font-family: "DM Sans", sans-serif; }
     .footer-note { margin-top: 28px; text-align: center; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; line-height: 1.8; }
   </style>
 </head>
@@ -213,10 +221,16 @@
               <div class="trip-name" id="trip-name-display">Trip in progress</div>
               <div class="trip-meta" id="trip-meta-display">Loading...</div>
             </div>
-            <button class="btn-trip-continue" onclick="continueTrip()">+ Add day</button>
+            <button class="btn-trip-continue" onclick="continueTrip()">+ Add session</button>
             <button class="btn-trip-new" onclick="confirmNewTrip()">New trip</button>
           </div>
         </div>
+      </div>
+
+      <!-- Previous albums -->
+      <div id="albums-history" style="display:none; margin-bottom:20px;">
+        <span class="slabel">Your curated trips</span>
+        <div id="albums-list"></div>
       </div>
 
       <!-- Album name (only shown for new trips) -->
@@ -319,8 +333,8 @@
       <div class="result-title" id="result-title">Day added to album</div>
       <div class="result-sub" id="result-summary"></div>
       <a href="#" id="album-link" class="btn-album" target="_blank">Open album in Google Photos →</a>
-      <button class="btn-next-day" onclick="nextDay()">+ Add another day →</button>
-      <button class="btn-reset" onclick="finishTrip()">Trip complete — start fresh</button>
+      <button class="btn-next-day" onclick="nextDay()">+ Add another session →</button>
+      <button class="btn-reset" onclick="finishTrip()">Album complete — start new</button>
     </div>
 
     <!-- Error -->
@@ -333,7 +347,8 @@
   </div>
 
   <div class="footer-note">
-    Curate day by day · Each session adds to your trip album · Progress saved in browser
+    Curate session by session · Each session adds to your album · Progress saved in browser<br>
+    <a href="/browse" style="color:var(--amber); text-decoration:none; font-size:11px;">Browse your albums →</a>
   </div>
   <div class="toast" id="toast"></div>
 
@@ -372,9 +387,11 @@
   let currentSessionId = null;
   let googleConnected = false;
   let activeTab = 'picker';
-  let tripState = null; // {albumId, albumUrl, albumName, daysAdded, totalKept}
+  let tripState = null; // {albumId, albumUrl, albumName, tranchesAdded, totalKept}
 
   // ── Init ──
+  let albumHistory = [];
+
   window.addEventListener('load', async () => {
     const params = new URLSearchParams(window.location.search);
     const auth = params.get('auth');
@@ -383,6 +400,7 @@
 
     loadTripState();
     await checkAuth();
+    await loadAlbumHistory();
   });
 
   // ── Trip state (localStorage) ──
@@ -396,12 +414,70 @@
     } catch(e) {}
   }
 
+  async function loadAlbumHistory() {
+    try {
+      const r = await fetch(`${API}/api/albums`);
+      if (!r.ok) return;
+      const { albums } = await r.json();
+      albumHistory = albums;
+      renderAlbumHistory();
+    } catch(e) {}
+  }
+
+  function renderAlbumHistory() {
+    const container = document.getElementById('albums-history');
+    const list = document.getElementById('albums-list');
+    if (!albumHistory.length) { container.style.display = 'none'; return; }
+
+    // Don't show if trip banner is already showing the current album
+    const currentAlbumId = tripState?.albumId;
+    const otherAlbums = albumHistory.filter(a => a.album_id !== currentAlbumId);
+    if (!otherAlbums.length && tripState) { container.style.display = 'none'; return; }
+
+    container.style.display = 'block';
+    list.innerHTML = '';
+
+    albumHistory.forEach(album => {
+      const isActive = album.album_id === currentAlbumId;
+      const item = document.createElement('div');
+      item.className = `album-history-item${isActive ? ' active' : ''}`;
+      const lastUpdated = album.last_updated ? new Date(album.last_updated).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      item.innerHTML = `
+        <span class="album-history-icon">${isActive ? '✈️' : '🎞'}</span>
+        <div class="album-history-info">
+          <div class="album-history-name">${esc(album.album_name)}</div>
+          <div class="album-history-meta">${album.photos_count} photos · ${album.tranches_count} day${album.tranches_count !== 1 ? 's' : ''}${lastUpdated ? ' · ' + lastUpdated : ''}</div>
+        </div>
+        <span class="album-history-action">${isActive ? 'Active ✓' : 'Resume →'}</span>
+      `;
+      if (!isActive) {
+        item.onclick = () => resumeAlbum(album);
+      }
+      list.appendChild(item);
+    });
+  }
+
+  function resumeAlbum(album) {
+    // Set this album as the active trip
+    tripState = {
+      albumId: album.album_id,
+      albumUrl: album.album_url,
+      albumName: album.album_name,
+      tranchesAdded: album.tranches_count,
+      totalKept: album.photos_count,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
+    showTripBanner();
+    renderAlbumHistory();
+    showToast(`Resumed "${album.album_name}"`);
+  }
+
   function saveTripState(albumId, albumUrl, albumName, kept) {
-    tripState = tripState || { albumId, albumUrl, albumName, daysAdded: 0, totalKept: 0 };
+    tripState = tripState || { albumId, albumUrl, albumName, tranchesAdded: 0, totalKept: 0 };
     tripState.albumId = albumId;
     tripState.albumUrl = albumUrl;
     tripState.albumName = albumName;
-    tripState.daysAdded = (tripState.daysAdded || 0) + 1;
+    tripState.tranchesAdded = (tripState.tranchesAdded || 0) + 1;
     tripState.totalKept = (tripState.totalKept || 0) + kept;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
   }
@@ -416,7 +492,7 @@
     document.getElementById('trip-banner').classList.add('show');
     document.getElementById('trip-name-display').textContent = tripState.albumName;
     document.getElementById('trip-meta-display').textContent =
-      `${tripState.daysAdded} day${tripState.daysAdded !== 1 ? 's' : ''} curated · ${tripState.totalKept} photos added · tap to continue`;
+      `${tripState.tranchesAdded} day${tripState.tranchesAdded !== 1 ? 's' : ''} curated · ${tripState.totalKept} photos added · tap to continue`;
     document.getElementById('album-name-field').style.display = 'none';
     document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
   }
@@ -428,7 +504,7 @@
   }
 
   function confirmNewTrip() {
-    if (confirm(`Start a new trip? This will end "${tripState.albumName}".`)) {
+    if (confirm(`Start a new album? This will archive "${tripState.albumName}".`)) {
       clearTripState();
       document.getElementById('trip-banner').classList.remove('show');
       document.getElementById('album-name-field').style.display = 'block';
@@ -654,7 +730,7 @@
     document.getElementById('preview-title').textContent = preview.album_name;
     const totalKept = countKept();
     const albumContext = tripState
-      ? `Adding to "${tripState.albumName}" · Day ${tripState.daysAdded + 1}`
+      ? `Adding to "${tripState.albumName}" · Day ${tripState.tranchesAdded + 1}`
       : 'New album';
     document.getElementById('preview-meta').textContent = `${preview.total_found} photos found · ${totalKept} selected · ${albumContext}`;
     document.getElementById('ratio-count').textContent = `${totalKept} photos`;
@@ -793,13 +869,13 @@
     const albumUrl = job.album_url === 'no_google_token' ? '#' : job.album_url;
     const albumId = job.album_id || tripState?.albumId || '';
 
-    // Save trip state
     saveTripState(albumId, albumUrl, albumName, job.kept);
+    await loadAlbumHistory();
 
-    const isFirst = tripState.daysAdded === 1;
+    const isFirst = tripState.tranchesAdded === 1;
     document.getElementById('result-title').textContent = isFirst ? 'Album created!' : 'Day added to album';
     document.getElementById('result-summary').textContent =
-      `${job.kept} photos added (${pct}% of ${job.total} found). Trip total: ${tripState.totalKept} photos across ${tripState.daysAdded} day${tripState.daysAdded!==1?'s':''}.`;
+      `${job.kept} photos added (${pct}% of ${job.total} found). Trip total: ${tripState.totalKept} photos across ${tripState.tranchesAdded} day${tripState.tranchesAdded!==1?'s':''}.`;
     document.getElementById('album-link').href = albumUrl;
     showSection('success');
   }

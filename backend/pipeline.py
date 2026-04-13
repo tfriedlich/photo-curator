@@ -12,8 +12,99 @@ from state import job_store
 import config
 
 WORK_DIR = Path("/tmp/photo-curator/jobs")
+MANIFEST_DIR = Path("/tmp/photo-curator/manifests")
+MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp"}
 GOOGLE_PHOTOS_PAGE_SIZE = 100
+
+
+def get_album_manifest(album_id: str) -> set:
+    """Return set of filenames already uploaded to this album."""
+    manifest_path = MANIFEST_DIR / f"{album_id}.txt"
+    if not manifest_path.exists():
+        return set()
+    return set(manifest_path.read_text().splitlines())
+
+
+def create_linked_album(album_url: str, album_name: str, description: str = "") -> dict:
+    """Create a manifest entry for a manually linked Google Photos album."""
+    import datetime
+    import hashlib
+    # Generate a stable ID from the URL
+    album_id = "linked_" + hashlib.md5(album_url.encode()).hexdigest()[:12]
+    manifest_path = MANIFEST_DIR / f"{album_id}.txt"
+    if manifest_path.exists():
+        return {"error": "Album already linked", "album_id": album_id}
+
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    with open(manifest_path, "w") as f:
+        f.write(f"# name={album_name}\n")
+        f.write(f"# url={album_url}\n")
+        f.write(f"# created={now}\n")
+        f.write(f"# last_updated={now}\n")
+        f.write(f"# type=linked\n")
+        if description:
+            f.write(f"# narrative={description.replace(chr(10), ' ')}\n")
+
+    _get_logger().info(f"Linked album created: {album_name}", album_id=album_id)
+    return {"album_id": album_id, "album_name": album_name}
+
+
+def update_linked_album(album_id: str, album_name: str = None, description: str = None, cover_url: str = None):
+    """Update metadata for a linked album."""
+    import datetime
+    manifest_path = MANIFEST_DIR / f"{album_id}.txt"
+    if not manifest_path.exists():
+        return {"error": "Album not found"}
+
+    existing_meta = {}
+    for line in manifest_path.read_text().splitlines():
+        if line.startswith("#"):
+            try:
+                key, val = line[1:].strip().split("=", 1)
+                existing_meta[key.strip()] = val.strip()
+            except Exception:
+                pass
+
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    if album_name:
+        existing_meta["name"] = album_name
+    if description:
+        existing_meta["narrative"] = description.replace("
+", " ")
+    if cover_url:
+        existing_meta["cover_url"] = cover_url
+    existing_meta["last_updated"] = now
+
+    with open(manifest_path, "w") as f:
+        for key, val in existing_meta.items():
+            f.write(f"# {key}={val}\n")
+
+    return {"ok": True}
+
+
+def delete_album_manifest(album_id: str) -> dict:
+    """Delete an album manifest (unlink or remove curated album record)."""
+    manifest_path = MANIFEST_DIR / f"{album_id}.txt"
+    if not manifest_path.exists():
+        return {"error": "Album not found"}
+    manifest_path.unlink()
+    _get_logger().info(f"Album manifest deleted", album_id=album_id)
+    return {"ok": True}
+
+
+def update_album_manifest(album_id: str, filenames: list):
+    """Append newly uploaded filenames to the album manifest."""
+    manifest_path = MANIFEST_DIR / f"{album_id}.txt"
+    existing = get_album_manifest(album_id)
+    new_entries = [f for f in filenames if f not in existing]
+    if new_entries:
+        with open(manifest_path, "a") as f:
+            f.write("
+".join(new_entries) + "
+")
+        _get_logger().info(f"Manifest updated: {len(new_entries)} new, {len(existing) + len(new_entries)} total", album_id=album_id)
+    return len(new_entries)
 
 
 def _get_logger():
@@ -373,6 +464,45 @@ Respond with ONLY valid JSON mapping date to name, no markdown:
 
 
 # ── Stage 6: Enhance a single photo ───────────────────────────────────────────
+async def generate_album_narrative(album_name: str, all_scenes: list, date_range: tuple, photo_count: int) -> str:
+    """Generate a 2-3 sentence human narrative description of the album."""
+    if not config.ANTHROPIC_API_KEY:
+        return ""
+    try:
+        scenes_str = ", ".join(list(dict.fromkeys(all_scenes))[:20])  # dedupe, limit 20
+        date_str = ""
+        if date_range[0] and date_range[1]:
+            if date_range[0] == date_range[1]:
+                date_str = date_range[0]
+            else:
+                date_str = f"{date_range[0]} to {date_range[1]}"
+
+        prompt = f"""Write a 2-3 sentence narrative description for a family photo album called "{album_name}".
+
+Context:
+- Photo count: {photo_count} photos
+- Date range: {date_str or "unknown"}
+- Scene types captured: {scenes_str or "family moments"}
+
+Write a warm, vivid description that captures the spirit of the trip. Sound like a human writing a caption, not a robot. Don't use the word "album". Don't start with "This". Be specific about activities and places if the scene tags suggest them. Keep it under 60 words."""
+
+        payload = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 150,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": config.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json=payload,
+            )
+            return r.json()["content"][0]["text"].strip()
+    except Exception as e:
+        _get_logger().error(f"Narrative generation failed: {e}")
+        return ""
+
+
 async def enhance_photo(path: Path, enhance_notes: str) -> tuple[Path, str]:
     """
     Apply targeted corrections based on enhance_notes.
@@ -442,13 +572,18 @@ async def enhance_photo(path: Path, enhance_notes: str) -> tuple[Path, str]:
 async def upload_to_google_photos(paths, album_name, access_token,
                                    existing_album_id=None, existing_album_url=None):
     if not access_token:
+        _get_logger().warn("No access token -- skipping Google Photos upload")
         return None, None
+
+    BATCH_SIZE = 10  # Upload and create in small batches to avoid timeouts/limits
     headers = {"Authorization": f"Bearer {access_token}", "Content-type": "application/json"}
-    async with httpx.AsyncClient(timeout=60) as client:
-        # Use existing album or create new one
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        # Create or use existing album
         if existing_album_id:
             album_id = existing_album_id
             album_url = existing_album_url
+            _get_logger().info(f"Adding to existing album", album_id=album_id)
         else:
             r = await client.post(
                 "https://photoslibrary.googleapis.com/v1/albums",
@@ -459,33 +594,70 @@ async def upload_to_google_photos(paths, album_name, access_token,
             album_id = album.get("id")
             album_url = album.get("productUrl")
             if not album_id:
+                _get_logger().error(f"Failed to create album: {album}")
                 return None, None
+            _get_logger().info(f"Created album '{album_name}'", album_id=album_id)
 
-        media_item_tokens = []
-        for path in paths:
-            upload_headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-type": "application/octet-stream",
-                "X-Goog-Upload-Content-Type": "image/jpeg",
-                "X-Goog-Upload-Protocol": "raw",
-            }
-            r = await client.post(
-                "https://photoslibrary.googleapis.com/v1/uploads",
-                headers=upload_headers,
-                content=path.read_bytes(),
-            )
-            if r.status_code == 200:
-                media_item_tokens.append({
-                    "simpleMediaItem": {"uploadToken": r.text, "fileName": path.name}
-                })
+        # Process in batches of BATCH_SIZE
+        total = len(paths)
+        uploaded = 0
+        failed = 0
 
-        if media_item_tokens:
-            await client.post(
-                "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate",
-                headers=headers,
-                json={"albumId": album_id, "newMediaItems": media_item_tokens},
-            )
-    return album_url, album_id
+        for batch_start in range(0, total, BATCH_SIZE):
+            batch = paths[batch_start:batch_start + BATCH_SIZE]
+            batch_tokens = []
+
+            # 1. Upload bytes for this batch
+            for path in batch:
+                try:
+                    upload_headers = {
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-type": "application/octet-stream",
+                        "X-Goog-Upload-Content-Type": "image/jpeg",
+                        "X-Goog-Upload-Protocol": "raw",
+                    }
+                    r = await client.post(
+                        "https://photoslibrary.googleapis.com/v1/uploads",
+                        headers=upload_headers,
+                        content=path.read_bytes(),
+                    )
+                    if r.status_code == 200:
+                        batch_tokens.append({
+                            "simpleMediaItem": {"uploadToken": r.text, "fileName": path.name}
+                        })
+                        _get_logger().info(f"Uploaded {path.name} ({batch_start + len(batch_tokens)}/{total})")
+                    else:
+                        _get_logger().error(f"Upload failed for {path.name}: HTTP {r.status_code}")
+                        failed += 1
+                except Exception as e:
+                    _get_logger().error(f"Upload exception for {path.name}: {e}")
+                    failed += 1
+
+            # 2. Immediately batchCreate this batch (tokens are still fresh)
+            if batch_tokens:
+                try:
+                    r = await client.post(
+                        "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate",
+                        headers=headers,
+                        json={"albumId": album_id, "newMediaItems": batch_tokens},
+                    )
+                    result = r.json()
+                    # Check for partial failures
+                    for item_result in result.get("newMediaItemResults", []):
+                        status = item_result.get("status", {})
+                        if status.get("code", 0) != 0:
+                            _get_logger().error(f"batchCreate item failed: {status.get('message')}")
+                            failed += 1
+                        else:
+                            uploaded += 1
+                    _get_logger().info(f"Batch {batch_start//BATCH_SIZE + 1}: {len(batch_tokens)} created, running total {uploaded}/{total}")
+                except Exception as e:
+                    _get_logger().error(f"batchCreate exception for batch {batch_start//BATCH_SIZE + 1}: {e}")
+                    failed += len(batch_tokens)
+
+        _get_logger().info(f"Upload complete: {uploaded} succeeded, {failed} failed of {total} total")
+
+    return album_url, album_id, keeper_filenames
 
 
 # ── Main pipeline ──────────────────────────────────────────────────────────────
@@ -667,7 +839,7 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
             preview={
                 "album_name": album_name,
                 "total_found": total_found,
-                "days": preview_days,
+                "tranches": preview_days,
             },
             all_clusters=all_candidates_serializable,
             work_dir=str(work_dir),
@@ -681,7 +853,8 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
 
 
 async def confirm_and_upload(job_id, access_token, created_album_ids=None,
-                             existing_album_id=None, existing_album_url=None):
+                             existing_album_id=None, existing_album_url=None,
+                             already_uploaded_ids=None):
     """Upload the approved photo set to Google Photos."""
     try:
         job = job_store[job_id]
@@ -689,12 +862,10 @@ async def confirm_and_upload(job_id, access_token, created_album_ids=None,
         preview = job["preview"]
         album_name = preview["album_name"]
 
-        stage = "Adding to album" if existing_album_id else "Creating Google Photos album"
-        update_job(job_id, status="uploading", stage=stage, progress=92)
-
         # Collect approved, non-removed photos
         keeper_paths = []
-        for day in preview["days"]:
+        keeper_filenames = []
+        for day in preview["tranches"]:
             for photo in day["photos"]:
                 if not photo.get("removed"):
                     filename = photo["filename"]
@@ -702,14 +873,108 @@ async def confirm_and_upload(job_id, access_token, created_album_ids=None,
                     path = work_dir / (enhanced if enhanced and (work_dir / enhanced).exists() else filename)
                     if path.exists():
                         keeper_paths.append(path)
+                        keeper_filenames.append(filename)
 
-        album_url, album_id = await upload_to_google_photos(
+        # Check manifest for already-uploaded filenames if we have an album ID
+        skipped_dupes = 0
+        if existing_album_id:
+            already_uploaded = get_album_manifest(existing_album_id)
+            if already_uploaded:
+                filtered_paths = []
+                filtered_filenames = []
+                for path, filename in zip(keeper_paths, keeper_filenames):
+                    if filename in already_uploaded:
+                        _get_logger().info(f"Skipping {filename} -- already in album")
+                        skipped_dupes += 1
+                    else:
+                        filtered_paths.append(path)
+                        filtered_filenames.append(filename)
+                keeper_paths = filtered_paths
+                keeper_filenames = filtered_filenames
+                if skipped_dupes:
+                    _get_logger().info(f"Skipped {skipped_dupes} already-uploaded photos")
+
+        stage = f"Adding {len(keeper_paths)} photos to album" if existing_album_id else f"Creating album with {len(keeper_paths)} photos"
+        update_job(job_id, status="uploading", stage=stage, progress=92)
+        _get_logger().info(f"Starting upload of {len(keeper_paths)} photos", existing_album=bool(existing_album_id), skipped=skipped_dupes)
+
+        album_url, album_id, uploaded_filenames = await upload_to_google_photos(
             keeper_paths, album_name, access_token,
             existing_album_id, existing_album_url
         )
 
         if album_id and created_album_ids is not None:
             created_album_ids.add(album_id)
+
+        # Collect this session's metadata
+        session_scenes = []
+        session_scores = []
+        session_dates = []
+        preview = job.get("preview", {})
+        for day in preview.get("days", []):
+            for photo in day.get("photos", []):
+                if not photo.get("removed"):
+                    if photo.get("scene"):
+                        session_scenes.append(photo["scene"])
+                    if photo.get("score"):
+                        session_scores.append(float(photo["score"]))
+            if day.get("date") and day["date"] != "unknown":
+                session_dates.append(day["date"])
+
+        session_date_range = (
+            min(session_dates) if session_dates else None,
+            max(session_dates) if session_dates else None
+        )
+        cover_url = album_url or ""
+
+        # Merge with existing manifest context for full-album narrative
+        existing_manifest_meta = {}
+        if album_id:
+            manifest_path = MANIFEST_DIR / f"{album_id}.txt"
+            if manifest_path.exists():
+                for line in manifest_path.read_text().splitlines():
+                    if line.startswith("#"):
+                        try:
+                            key, val = line[1:].strip().split("=", 1)
+                            existing_manifest_meta[key.strip()] = val.strip()
+                        except Exception:
+                            pass
+
+        # Build full accumulated scenes for narrative context
+        existing_scenes = set(
+            s.strip() for s in existing_manifest_meta.get("scenes", "").split(",") if s.strip()
+        )
+        all_scenes = list(existing_scenes | set(s for s in session_scenes if s.strip()))
+
+        # Build full date range
+        existing_start = existing_manifest_meta.get("date_range_start")
+        existing_end = existing_manifest_meta.get("date_range_end")
+        all_dates = [d for d in [existing_start, existing_end, session_date_range[0], session_date_range[1]] if d]
+        full_date_range = (min(all_dates) if all_dates else None, max(all_dates) if all_dates else None)
+
+        # Total photos across all sessions for narrative context
+        total_manifest_photos = len(get_album_manifest(album_id)) if album_id else 0
+        total_photos_for_narrative = total_manifest_photos + len(keeper_filenames)
+
+        # Generate narrative using FULL album context
+        narrative = ""
+        if album_id:
+            try:
+                narrative = await generate_album_narrative(
+                    album_name, all_scenes, full_date_range, total_photos_for_narrative
+                )
+                _get_logger().info(f"Generated narrative: {narrative[:80]}...")
+            except Exception as e:
+                _get_logger().error(f"Narrative generation error: {e}")
+
+        # Update manifest with this session's data -- writer handles accumulation
+        if album_id:
+            update_album_manifest(
+                album_id, album_name, album_url or "", keeper_filenames,
+                scenes=session_scenes, scores=session_scores,
+                date_range=session_date_range, cover_url=cover_url,
+                narrative=narrative,  # Full album narrative overwrites previous
+            )
 
         update_job(
             job_id,

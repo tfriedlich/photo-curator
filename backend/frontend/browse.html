@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Curator — Your Albums</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #1a1612; --paper: #f5f0e8; --cream: #ede8de; --amber: #c8883a;
+      --amber-pale: #fdf4e3; --muted: #8a7f72; --green: #3a7a5a;
+      --border: #d4cdc0; --shadow: rgba(26,22,18,0.12); --blue: #2563eb;
+    }
+    html, body { min-height: 100%; background: var(--paper); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 300; }
+    body { padding: 48px 24px 80px; max-width: 1100px; margin: 0 auto; }
+
+    header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 48px; flex-wrap: wrap; gap: 12px; }
+    .wordmark { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--ink); }
+    .wordmark em { font-style: italic; color: var(--amber); }
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+    .nav-link { font-size: 12px; color: var(--muted); text-decoration: none; font-family: 'DM Mono', monospace; }
+    .nav-link:hover { color: var(--amber); }
+    .btn-link-album { padding: 9px 16px; background: var(--amber); color: white; border: none; border-radius: 3px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .btn-link-album:hover { background: #b8782a; }
+
+    h1 { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 400; margin-bottom: 8px; }
+    .subtitle { font-size: 13px; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 40px; }
+
+    /* Filter tabs */
+    .filter-tabs { display: flex; gap: 8px; margin-bottom: 28px; }
+    .filter-tab { padding: 7px 14px; border: 1px solid var(--border); border-radius: 20px; font-size: 12px; font-family: 'DM Mono', monospace; cursor: pointer; background: white; color: var(--muted); transition: all 0.15s; }
+    .filter-tab.active { background: var(--ink); color: white; border-color: var(--ink); }
+    .filter-tab:hover:not(.active) { background: var(--cream); }
+
+    .albums-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px; }
+
+    .album-card { background: white; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; box-shadow: 0 2px 16px var(--shadow); transition: transform 0.15s, box-shadow 0.15s; position: relative; }
+    .album-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px var(--shadow); }
+    .album-card.linked { border-color: #bfdbfe; }
+
+    .album-type-badge { position: absolute; top: 10px; left: 10px; z-index: 2; font-size: 9px; font-family: 'DM Mono', monospace; padding: 3px 8px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .album-type-badge.curated { background: var(--amber); color: white; }
+    .album-type-badge.linked { background: var(--blue); color: white; }
+
+    .album-cover { height: 180px; background: var(--cream); position: relative; overflow: hidden; }
+    .album-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .album-cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 48px; }
+    .album-cover-placeholder.curated { background: linear-gradient(135deg, var(--cream), var(--amber-pale)); }
+    .album-cover-placeholder.linked { background: linear-gradient(135deg, #eff6ff, #dbeafe); }
+    .album-score-badge { position: absolute; top: 10px; right: 10px; background: rgba(26,22,18,0.7); color: white; font-size: 10px; font-family: 'DM Mono', monospace; padding: 3px 8px; border-radius: 2px; }
+    .album-date-badge { position: absolute; bottom: 10px; right: 10px; background: rgba(26,22,18,0.7); color: white; font-size: 10px; font-family: 'DM Mono', monospace; padding: 3px 8px; border-radius: 2px; }
+
+    .album-body { padding: 20px; }
+    .album-name { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 6px; line-height: 1.3; }
+    .album-narrative { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 14px; font-style: italic; }
+    .album-scenes { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+    .scene-tag { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); background: var(--cream); border: 1px solid var(--border); padding: 2px 7px; border-radius: 2px; }
+    .album-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; border-top: 1px solid var(--border); }
+    .album-stats { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; line-height: 1.6; }
+    .album-actions { display: flex; gap: 6px; }
+    .btn-view { padding: 8px 14px; background: var(--amber); color: white; text-decoration: none; border-radius: 3px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+    .btn-view:hover { background: #b8782a; }
+    .btn-view.linked { background: var(--blue); }
+    .btn-view.linked:hover { background: #1d4ed8; }
+    .btn-secondary { padding: 8px 12px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; }
+    .btn-secondary:hover { background: var(--cream); color: var(--ink); }
+    .btn-danger { padding: 8px 12px; background: none; border: 1px solid #fca5a5; color: #c94040; border-radius: 3px; font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+    .btn-danger:hover { background: #fef2f2; }
+
+    /* Link album modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(26,22,18,0.5); z-index: 100; align-items: center; justify-content: center; padding: 24px; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: white; border-radius: 4px; padding: 32px; width: 100%; max-width: 480px; box-shadow: 0 8px 40px rgba(26,22,18,0.2); }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 6px; }
+    .modal-sub { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 24px; line-height: 1.6; }
+    .modal-field { margin-bottom: 16px; }
+    .modal-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: block; }
+    .modal-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink); background: var(--paper); outline: none; }
+    .modal-input:focus { border-color: var(--amber); }
+    textarea.modal-input { resize: vertical; min-height: 80px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .btn-modal-cancel { padding: 10px 16px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 3px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .btn-modal-save { padding: 10px 20px; background: var(--amber); color: white; border: none; border-radius: 3px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .btn-modal-save:hover { background: #b8782a; }
+    .btn-modal-save:disabled { background: var(--muted); cursor: not-allowed; }
+    .modal-error { font-size: 12px; color: #c94040; font-family: 'DM Mono', monospace; margin-top: 8px; }
+
+    .empty-state { text-align: center; padding: 80px 40px; color: var(--muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--ink); margin-bottom: 8px; }
+    .empty-sub { font-size: 13px; line-height: 1.7; }
+    .btn-start { display: inline-block; margin-top: 20px; padding: 12px 24px; background: var(--amber); color: white; text-decoration: none; border-radius: 3px; font-size: 13px; font-weight: 500; }
+
+    .loading { text-align: center; padding: 80px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 20px; border-radius: 3px; font-size: 12px; font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 200; white-space: nowrap; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wordmark">Photo <em>Curator</em></div>
+    <div class="header-actions">
+      <button class="btn-link-album" onclick="openLinkModal()">+ Link existing album</button>
+      <a href="/" class="nav-link">← Back to curator</a>
+    </div>
+  </header>
+
+  <h1>Your Albums</h1>
+  <div class="subtitle" id="subtitle">Loading...</div>
+
+  <div class="filter-tabs">
+    <button class="filter-tab active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-tab" onclick="setFilter('curated', this)">✨ Curated</button>
+    <button class="filter-tab" onclick="setFilter('linked', this)">🔗 Linked</button>
+  </div>
+
+  <div id="albums-container" class="loading">Loading your albums...</div>
+
+  <!-- Link album modal -->
+  <div class="modal-overlay" id="link-modal">
+    <div class="modal">
+      <div class="modal-title">Link a Google Photos album</div>
+      <div class="modal-sub">Add any Google Photos album to your browse page. Paste the album URL from photos.google.com/album/...</div>
+      <div class="modal-field">
+        <span class="modal-label">Google Photos URL</span>
+        <input class="modal-input" id="link-url" type="url" placeholder="https://photos.google.com/album/..."/>
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">Album name</span>
+        <input class="modal-input" id="link-name" type="text" placeholder="e.g. Costa Rica 2026"/>
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">Description <span style="font-weight:300;text-transform:none;letter-spacing:0">(optional)</span></span>
+        <textarea class="modal-input" id="link-desc" placeholder="A quick note about what's in this album..."></textarea>
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">Cover photo URL <span style="font-weight:300;text-transform:none;letter-spacing:0">(optional)</span></span>
+        <input class="modal-input" id="link-cover" type="url" placeholder="Direct image URL for cover..."/>
+      </div>
+      <div class="modal-error" id="link-error"></div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeLinkModal()">Cancel</button>
+        <button class="btn-modal-save" id="link-save-btn" onclick="saveLinkAlbum()">Link Album</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  const API = window.location.origin;
+  const STORAGE_KEY = 'photo_curator_trip';
+  let allAlbums = [];
+  let activeFilter = 'all';
+
+  window.addEventListener('load', loadAlbums);
+
+  async function loadAlbums() {
+    try {
+      const r = await fetch(`${API}/api/albums`);
+      const { albums } = await r.json();
+      allAlbums = albums;
+      renderAlbums();
+    } catch(e) {
+      document.getElementById('albums-container').innerHTML =
+        `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Could not load albums</div><div class="empty-sub">${esc(e.message)}</div></div>`;
+    }
+  }
+
+  function setFilter(filter, btn) {
+    activeFilter = filter;
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    renderAlbums();
+  }
+
+  function renderAlbums() {
+    const filtered = activeFilter === 'all' ? allAlbums : allAlbums.filter(a => a.type === activeFilter);
+    const subtitle = document.getElementById('subtitle');
+    const container = document.getElementById('albums-container');
+    const curated = allAlbums.filter(a => a.type === 'curated').length;
+    const linked = allAlbums.filter(a => a.type === 'linked').length;
+    subtitle.textContent = `${allAlbums.length} album${allAlbums.length !== 1 ? 's' : ''} · ${curated} curated · ${linked} linked · ${allAlbums.reduce((s,a) => s + a.photos_count, 0)} photos total`;
+
+    if (!filtered.length) {
+      container.className = '';
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">${activeFilter === 'linked' ? '🔗' : '🎞'}</div>
+          <div class="empty-title">No ${activeFilter === 'all' ? '' : activeFilter} albums yet</div>
+          <div class="empty-sub">${activeFilter === 'linked'
+            ? 'Click "+ Link existing album" to add any Google Photos album to your browse page.'
+            : 'Head back to the curator to start your first trip album.'}</div>
+          ${activeFilter !== 'linked' ? '<a href="/" class="btn-start">Start curating →</a>' : ''}
+        </div>`;
+      return;
+    }
+
+    container.className = 'albums-grid';
+    container.innerHTML = filtered.map(album => albumCard(album)).join('');
+  }
+
+  function albumCard(album) {
+    const isCurated = album.type === 'curated' || !album.type;
+    const typeLabel = isCurated ? 'Curated' : 'Linked';
+    const typeClass = isCurated ? 'curated' : 'linked';
+
+    const coverHtml = album.cover_url
+      ? `<img src="${esc(album.cover_url)}${isCurated ? '=w640-h360-c' : ''}" alt=""
+            onerror="this.parentElement.innerHTML='<div class=\\'album-cover-placeholder ${typeClass}\\'>${isCurated ? '🎞' : '🔗'}</div>'">`
+      : `<div class="album-cover-placeholder ${typeClass}">${isCurated ? '🎞' : '🔗'}</div>`;
+
+    const dateStr = formatDateRange(album.date_range_start, album.date_range_end);
+    const avgScore = album.avg_score > 0 ? `★ ${Number(album.avg_score).toFixed(1)}` : '';
+    const scenes = (album.scenes || []).filter(Boolean).slice(0, 6);
+    const sceneTags = scenes.map(s => `<span class="scene-tag">${esc(s)}</span>`).join('');
+    const narrative = album.narrative || '';
+    const lastUpdated = album.last_updated
+      ? new Date(album.last_updated).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})
+      : '';
+
+    const statsLine = isCurated
+      ? `${album.photos_count} photos · ${album.tranches_count} session${album.tranches_count !== 1 ? 's' : ''}`
+      : `Linked album`;
+
+    const albumJson = esc(JSON.stringify(album));
+
+    return `
+      <div class="album-card ${typeClass}">
+        <div class="album-type-badge ${typeClass}">${typeLabel}</div>
+        <div class="album-cover">${coverHtml}
+          ${avgScore ? `<div class="album-score-badge">${avgScore}</div>` : ''}
+          ${dateStr ? `<div class="album-date-badge">${dateStr}</div>` : ''}
+        </div>
+        <div class="album-body">
+          <div class="album-name">${esc(album.album_name)}</div>
+          ${narrative ? `<div class="album-narrative">"${esc(narrative)}"</div>` : ''}
+          ${sceneTags ? `<div class="album-scenes">${sceneTags}</div>` : ''}
+          <div class="album-footer">
+            <div class="album-stats">
+              ${statsLine}
+              ${lastUpdated ? `<br>${lastUpdated}` : ''}
+            </div>
+            <div class="album-actions">
+              ${isCurated ? `<button class="btn-secondary" onclick="resumeAlbum(${albumJson})">+ Add</button>` : ''}
+              ${!isCurated ? `<button class="btn-secondary" onclick="editLinkedAlbum(${albumJson})">Edit</button>` : ''}
+              <button class="btn-danger" onclick="removeAlbum('${esc(album.album_id)}', ${albumJson})" title="Remove from browse">✕</button>
+              ${album.album_url ? `<a href="${esc(album.album_url)}" target="_blank" class="btn-view ${typeClass}">Open →</a>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function resumeAlbum(album) {
+    const tripState = {
+      albumId: album.album_id,
+      albumUrl: album.album_url,
+      albumName: album.album_name,
+      tranchesAdded: album.tranches_count,
+      totalKept: album.photos_count,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tripState));
+    showToast(`Resumed "${album.album_name}" — redirecting...`);
+    setTimeout(() => window.location.href = '/', 1200);
+  }
+
+  async function removeAlbum(albumId, album) {
+    const label = album.type === 'linked' ? 'Unlink' : 'Remove';
+    if (!confirm(`${label} "${album.album_name}" from your browse page? This does not delete the Google Photos album.`)) return;
+    try {
+      const r = await fetch(`${API}/api/albums/${albumId}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error('Failed to remove');
+      allAlbums = allAlbums.filter(a => a.album_id !== albumId);
+      renderAlbums();
+      showToast(`Removed "${album.album_name}"`);
+    } catch(e) { showToast('Error: ' + e.message); }
+  }
+
+  // ── Link modal ──
+  function openLinkModal() {
+    document.getElementById('link-url').value = '';
+    document.getElementById('link-name').value = '';
+    document.getElementById('link-desc').value = '';
+    document.getElementById('link-cover').value = '';
+    document.getElementById('link-error').textContent = '';
+    document.getElementById('link-modal').classList.add('show');
+    setTimeout(() => document.getElementById('link-url').focus(), 50);
+  }
+
+  function closeLinkModal() {
+    document.getElementById('link-modal').classList.remove('show');
+  }
+
+  async function saveLinkAlbum() {
+    const url = document.getElementById('link-url').value.trim();
+    const name = document.getElementById('link-name').value.trim();
+    const desc = document.getElementById('link-desc').value.trim();
+    const cover = document.getElementById('link-cover').value.trim();
+    const errEl = document.getElementById('link-error');
+    const btn = document.getElementById('link-save-btn');
+
+    if (!url) { errEl.textContent = 'URL is required'; return; }
+    if (!name) { errEl.textContent = 'Album name is required'; return; }
+    if (!url.startsWith('https://photos.google.com')) { errEl.textContent = 'Must be a Google Photos URL'; return; }
+
+    btn.disabled = true; btn.textContent = 'Linking...';
+    errEl.textContent = '';
+
+    try {
+      const r = await fetch(`${API}/api/albums/link`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ album_url: url, album_name: name, description: desc, cover_url: cover }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        errEl.textContent = err.detail || 'Failed to link album';
+        btn.disabled = false; btn.textContent = 'Link Album';
+        return;
+      }
+      closeLinkModal();
+      await loadAlbums();
+      showToast(`Linked "${name}"`);
+    } catch(e) {
+      errEl.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Link Album';
+    }
+  }
+
+  // Edit linked album -- reuse modal
+  function editLinkedAlbum(album) {
+    document.getElementById('link-url').value = album.album_url;
+    document.getElementById('link-url').disabled = true;
+    document.getElementById('link-name').value = album.album_name;
+    document.getElementById('link-desc').value = album.narrative || '';
+    document.getElementById('link-cover').value = album.cover_url || '';
+    document.getElementById('link-error').textContent = '';
+    document.getElementById('link-modal').classList.add('show');
+
+    const btn = document.getElementById('link-save-btn');
+    btn.textContent = 'Save changes';
+    btn.onclick = async () => {
+      const name = document.getElementById('link-name').value.trim();
+      const desc = document.getElementById('link-desc').value.trim();
+      const cover = document.getElementById('link-cover').value.trim();
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        await fetch(`${API}/api/albums/${album.album_id}`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ album_name: name, description: desc, cover_url: cover }),
+        });
+        document.getElementById('link-url').disabled = false;
+        btn.onclick = saveLinkAlbum;
+        btn.textContent = 'Link Album';
+        closeLinkModal();
+        await loadAlbums();
+        showToast('Album updated');
+      } catch(e) {
+        document.getElementById('link-error').textContent = e.message;
+        btn.disabled = false; btn.textContent = 'Save changes';
+      }
+    };
+  }
+
+  // Close modal on overlay click
+  document.getElementById('link-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+      document.getElementById('link-url').disabled = false;
+      document.getElementById('link-save-btn').onclick = saveLinkAlbum;
+      document.getElementById('link-save-btn').textContent = 'Link Album';
+      closeLinkModal();
+    }
+  });
+
+  function formatDateRange(start, end) {
+    if (!start) return '';
+    const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    if (!end || start === end) return fmt(start);
+    const s = new Date(start), e = new Date(end);
+    if (s.getFullYear() !== e.getFullYear())
+      return `${fmt(start)}, ${s.getFullYear()} – ${fmt(end)}, ${e.getFullYear()}`;
+    return `${fmt(start)} – ${fmt(end)}`;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
