@@ -126,6 +126,15 @@ def update_job(job_id: str, **kwargs):
         _get_logger().info(f"[JOB] {kwargs['stage']}")
     if kwargs.get("status") == "error" and "error" in kwargs:
         _get_logger().error(f"Job failed: {kwargs['error']}")
+    # Push SSE event
+    try:
+        from main import push_job_event
+        event = {"type": "status"}
+        event.update({k: v for k, v in kwargs.items()
+                      if k in ("stage", "progress", "total", "kept", "status", "error", "album_url", "album_id")})
+        push_job_event(job_id, event)
+    except Exception:
+        pass
 
 
 # ── Stage 1: Fetch from Google Photos ─────────────────────────────────────────
@@ -395,12 +404,38 @@ CRITICAL FLATTERING CHECK:
                 if text.startswith("json"):
                     text = text[4:]
             result = json.loads(text.strip())
-            _get_logger().score(
-                path.name,
-                result.get("score", 5.0),
-                result.get("scene", "unknown"),
-                result.get("flattering", True),
-            )
+            score_val = result.get("score", 5.0)
+            scene_val = result.get("scene", "unknown")
+            flattering_val = result.get("flattering", True)
+            _get_logger().score(path.name, score_val, scene_val, flattering_val)
+            # Push score event with base64 thumbnail for live preview
+            try:
+                from main import push_job_event
+                import base64 as _b64
+                from PIL import Image as _Img
+                import io as _io
+                _thumb = _Img.open(path).convert("RGB")
+                _thumb.thumbnail((120, 120))
+                _buf = _io.BytesIO()
+                _thumb.save(_buf, "JPEG", quality=60)
+                _thumb_b64 = _b64.b64encode(_buf.getvalue()).decode()
+                # Find job_id from current job_store entry that owns this path
+                _job_id = next(
+                    (jid for jid, j in job_store.items()
+                     if j.get("status") == "running" and str(path).startswith(str(j.get("work_dir", "NOMATCH")))),
+                    None
+                )
+                if _job_id:
+                    push_job_event(_job_id, {
+                        "type": "score",
+                        "filename": path.name,
+                        "score": score_val,
+                        "scene": scene_val,
+                        "flattering": flattering_val,
+                        "thumb": _thumb_b64,
+                    })
+            except Exception:
+                pass
             return result
     except Exception as e:
         _get_logger().error(f'Exception scoring {path.name}: {e}')

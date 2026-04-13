@@ -113,10 +113,33 @@
     .stage-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink); margin-bottom: 12px; }
     .progress-track { height: 4px; background: var(--cream); border-radius: 2px; overflow: hidden; margin-bottom: 18px; }
     .progress-fill { height: 100%; background: var(--amber); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
-    .stats-row { display: flex; gap: 16px; }
+    .stats-row { display: flex; gap: 16px; margin-bottom: 18px; }
     .stat { flex: 1; background: var(--paper); border: 1px solid var(--border); border-radius: 3px; padding: 12px 14px; }
     .stat-value { font-family: 'Playfair Display', serif; font-size: 26px; color: var(--ink); line-height: 1; margin-bottom: 3px; }
     .stat-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    /* Live scoring feed */
+    .scoring-feed { border: 1px solid var(--border); border-radius: 3px; overflow: hidden; background: var(--paper); }
+    .scoring-feed-header { padding: 8px 12px; background: var(--cream); border-bottom: 1px solid var(--border); font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; display: flex; justify-content: space-between; }
+    .scoring-feed-body { max-height: 240px; overflow-y: auto; }
+    .scoring-feed-body::-webkit-scrollbar { width: 4px; }
+    .scoring-feed-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .score-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); animation: fadeIn 0.3s ease; }
+    .score-item:last-child { border-bottom: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .score-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 2px; flex-shrink: 0; background: var(--cream); }
+    .score-thumb-placeholder { width: 40px; height: 40px; border-radius: 2px; flex-shrink: 0; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .score-info { flex: 1; min-width: 0; }
+    .score-filename { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-scene { font-size: 11px; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-badge { font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 500; padding: 2px 7px; border-radius: 2px; white-space: nowrap; flex-shrink: 0; }
+    .score-badge.high { background: #dcfce7; color: #166534; }
+    .score-badge.mid { background: var(--amber-pale); color: #92400e; }
+    .score-badge.low { background: #fee2e2; color: #991b1b; }
+    .score-badge.skip { background: var(--cream); color: var(--muted); }
+    .log-item { padding: 6px 12px; font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); border-bottom: 1px solid var(--border); animation: fadeIn 0.2s ease; }
+    .log-item:last-child { border-bottom: none; }
+    .log-item.error { color: #c94040; background: #fef2f2; }
 
     /* Preview */
     #preview-panel { display: none; }
@@ -294,7 +317,15 @@
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
       <div class="stats-row">
         <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Photos found</div></div>
-        <div class="stat"><div class="stat-value" id="stat-kept">—</div><div class="stat-label">Candidates</div></div>
+        <div class="stat"><div class="stat-value" id="stat-kept">—</div><div class="stat-label">Scored</div></div>
+        <div class="stat"><div class="stat-value" id="stat-pass">—</div><div class="stat-label">Passing</div></div>
+      </div>
+      <div class="scoring-feed" id="scoring-feed" style="display:none;">
+        <div class="scoring-feed-header">
+          <span>Live scoring</span>
+          <span id="feed-count">0 photos</span>
+        </div>
+        <div class="scoring-feed-body" id="scoring-feed-body"></div>
       </div>
     </div>
 
@@ -542,6 +573,7 @@
     document.getElementById('confirm-btn-label').textContent = 'Create Album →';
     clearInterval(pollInterval);
     clearInterval(pickerPollInterval);
+    if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
   }
 
   // ── Auth ──
@@ -687,21 +719,128 @@
     } catch(err) { showError(err.message); }
   }
 
-  // ── Polling ──
+  // ── SSE stream ──
+  let currentEventSource = null;
+  let feedCount = 0;
+  let passCount = 0;
+
   function pollJob(jobId) {
+    feedCount = 0; passCount = 0;
+    document.getElementById('scoring-feed').style.display = 'none';
+    document.getElementById('scoring-feed-body').innerHTML = '';
+    document.getElementById('stat-pass').textContent = '—';
+
+    // Try SSE first, fall back to polling
+    try {
+      if (currentEventSource) { currentEventSource.close(); }
+      currentEventSource = new EventSource(`${API}/api/stream/${jobId}`);
+
+      currentEventSource.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          handlePipelineEvent(event, jobId);
+        } catch(err) {}
+      };
+
+      currentEventSource.onerror = () => {
+        currentEventSource.close();
+        currentEventSource = null;
+        // Fall back to polling
+        startPolling(jobId);
+      };
+    } catch(e) {
+      startPolling(jobId);
+    }
+  }
+
+  function startPolling(jobId) {
     pollInterval = setInterval(async () => {
       try {
         const job = await (await fetch(`${API}/api/status/${jobId}`)).json();
-        document.getElementById('stage-label').textContent = job.stage || '...';
-        document.getElementById('progress-fill').style.width = (job.progress||0)+'%';
-        if (job.total) document.getElementById('stat-total').textContent = job.total.toLocaleString();
-        if (job.kept) document.getElementById('stat-kept').textContent = job.kept.toLocaleString();
-        if (job.status === 'preview_ready') { clearInterval(pollInterval); await loadPreview(jobId); }
-        else if (job.status === 'uploading') { clearInterval(pollInterval); showSection('uploading'); pollUpload(jobId); }
-        else if (job.status === 'done') { clearInterval(pollInterval); showDone(job); }
-        else if (job.status === 'error') { clearInterval(pollInterval); showError(job.error||'Unknown error'); }
+        handlePipelineEvent({type: 'status', ...job}, jobId);
       } catch(e) {}
     }, 2000);
+  }
+
+  function handlePipelineEvent(event, jobId) {
+    if (event.type === 'ping') return;
+
+    if (event.stage) {
+      document.getElementById('stage-label').textContent = event.stage;
+      addFeedLog(event.stage);
+    }
+    if (event.progress !== undefined)
+      document.getElementById('progress-fill').style.width = (event.progress||0)+'%';
+    if (event.total)
+      document.getElementById('stat-total').textContent = event.total.toLocaleString();
+
+    if (event.type === 'score') {
+      feedCount++;
+      if (event.flattering && event.score >= (parseFloat(document.getElementById('min-score-hint')?.value || '6'))) {
+        passCount++;
+      }
+      document.getElementById('stat-kept').textContent = feedCount.toLocaleString();
+      document.getElementById('stat-pass').textContent = passCount.toLocaleString();
+      document.getElementById('feed-count').textContent = `${feedCount} scored`;
+      document.getElementById('scoring-feed').style.display = 'block';
+      addFeedScore(event);
+      return;
+    }
+
+    if (event.status === 'preview_ready') {
+      if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
+      clearInterval(pollInterval);
+      loadPreview(jobId);
+    } else if (event.status === 'uploading') {
+      if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
+      clearInterval(pollInterval);
+      showSection('uploading');
+      pollUpload(jobId);
+    } else if (event.status === 'done') {
+      if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
+      clearInterval(pollInterval);
+      showDone(event);
+    } else if (event.status === 'error') {
+      if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
+      clearInterval(pollInterval);
+      showError(event.error || 'Unknown error');
+    }
+  }
+
+  function addFeedScore(event) {
+    const body = document.getElementById('scoring-feed-body');
+    const item = document.createElement('div');
+    item.className = 'score-item';
+    const score = parseFloat(event.score) || 0;
+    const badgeClass = !event.flattering ? 'skip' : score >= 7 ? 'high' : score >= 5.5 ? 'mid' : 'low';
+    const badgeLabel = !event.flattering ? '✕ skip' : `${score.toFixed(1)}`;
+    const thumbHtml = event.thumb
+      ? `<img class="score-thumb" src="data:image/jpeg;base64,${event.thumb}" alt="">`
+      : `<div class="score-thumb-placeholder">📷</div>`;
+    item.innerHTML = `
+      ${thumbHtml}
+      <div class="score-info">
+        <div class="score-filename">${esc(event.filename)}</div>
+        <div class="score-scene">${esc(event.scene || 'analyzing...')}</div>
+      </div>
+      <span class="score-badge ${badgeClass}">${badgeLabel}</span>
+    `;
+    body.insertBefore(item, body.firstChild);  // newest on top
+    // Keep max 30 items
+    while (body.children.length > 30) body.removeChild(body.lastChild);
+  }
+
+  function addFeedLog(msg) {
+    // Only show significant stage changes, not every poll
+    const significant = ['Downloading', 'Clustering', 'AI scoring', 'narrative', 'Preview ready', 'Creating album', 'Adding'];
+    if (!significant.some(s => msg.includes(s))) return;
+    const body = document.getElementById('scoring-feed-body');
+    if (!body || document.getElementById('scoring-feed').style.display === 'none') return;
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    item.textContent = `↳ ${msg}`;
+    body.insertBefore(item, body.firstChild);
+    while (body.children.length > 30) body.removeChild(body.lastChild);
   }
 
   function pollUpload(jobId) {
@@ -719,6 +858,12 @@
   async function loadPreview(jobId) {
     try {
       const preview = await (await fetch(`${API}/api/preview/${jobId}`)).json();
+      if (!preview || (!preview.tranches && !preview.days)) {
+        showError('Preview data missing expected structure (keys: ' + Object.keys(preview||{}).join(', ') + ')');
+        return;
+      }
+      // Normalise: accept either key defensively
+      if (!preview.tranches && preview.days) preview.tranches = preview.days;
       previewState = preview;
       renderPreview(jobId);
       showSection('preview');
@@ -737,7 +882,7 @@
     updateConfirmSummary();
     const container = document.getElementById('preview-days');
     container.innerHTML = '';
-    preview.days.forEach(day => {
+    preview.tranches.forEach(day => {
       const group = document.createElement('div');
       group.className = 'day-group';
       const kept = day.photos.filter(p => !p.removed).length;
@@ -771,7 +916,7 @@
   }
 
   function findPhoto(photoId, dayDate) {
-    for (const day of previewState.days) {
+    for (const day of previewState.tranches) {
       if (day.date === dayDate) { for (const photo of day.photos) { if (photo.id === photoId) return photo; } }
     }
     return null;
@@ -800,7 +945,7 @@
       const r = await fetch(`${API}/api/preview/${currentJobId}/swap`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({photo_id: photoId, day: dayDate}) });
       if (!r.ok) { showToast('No alternatives available'); return; }
       const { new_photo } = await r.json();
-      const day = previewState.days.find(d => d.date === dayDate);
+      const day = previewState.tranches.find(d => d.date === dayDate);
       if (day) { const idx = day.photos.findIndex(p => p.id === photoId); if (idx >= 0) { day.photos[idx] = new_photo; const old = document.getElementById(`card-${photoId}`); if (old) old.replaceWith(makePhotoCard(new_photo, dayDate, currentJobId)); } }
     } catch(e) { showToast('Swap failed'); }
   }
@@ -823,16 +968,16 @@
     }, 400);
   }
 
-  function countKept() { return previewState ? previewState.days.reduce((s,d) => s+d.photos.filter(p=>!p.removed).length, 0) : 0; }
+  function countKept() { return previewState ? previewState.tranches.reduce((s,d) => s+d.photos.filter(p=>!p.removed).length, 0) : 0; }
   function updateDayCount(dayDate) {
-    const day = previewState.days.find(d => d.date === dayDate); if (!day) return;
+    const day = previewState.tranches.find(d => d.date === dayDate); if (!day) return;
     const kept = day.photos.filter(p=>!p.removed).length;
     const grid = document.getElementById(`grid-${dayDate}`);
     if (grid) { const el = grid.previousElementSibling?.querySelector('.day-count'); if (el) el.textContent = `${kept} of ${day.photos_found} kept`; }
   }
   function updateConfirmSummary() {
     const kept = countKept();
-    const enhanced = previewState?.days.reduce((s,d)=>s+d.photos.filter(p=>p.enhanced).length,0)||0;
+    const enhanced = previewState?.tranches.reduce((s,d)=>s+d.photos.filter(p=>p.enhanced).length,0)||0;
     let text = `<strong>${kept} photos</strong> selected`;
     if (enhanced > 0) text += ` · ${enhanced} enhanced`;
     document.getElementById('confirm-summary').innerHTML = text;

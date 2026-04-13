@@ -15,8 +15,14 @@ import config
 from pipeline import run_pipeline, confirm_and_upload, enhance_photo, pick_best_from_cluster
 from state import job_store
 
+APP_VERSION = "v24"
+
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"Photo Curator {APP_VERSION} starting up")
 
 REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
 GOOGLE_SCOPES = " ".join([
@@ -41,6 +47,7 @@ class AppLogger:
             "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "level": level,
             "msg": msg,
+            "v": "v24",
         }
         if context:
             entry["ctx"] = context
@@ -486,6 +493,7 @@ async def curate_from_picker(
 
     logger.set_session(job_id)
     logger.info(f"[JOB] Starting picker curation", album=album_name, photos_selected="pending")
+    get_job_queue(job_id)  # Pre-create queue so stream endpoint can connect immediately
     background_tasks.add_task(
         run_pipeline_from_picker,
         job_id, session_id, album_name, access_token
@@ -503,7 +511,9 @@ async def get_logs(n: int = 200, level: str = None, session: str = None):
 @app.get("/api/logs/summary")
 async def get_log_summary():
     """Return a human-readable summary of the last run -- great for debugging failures."""
-    return logger.get_last_session_summary()
+    summary = logger.get_last_session_summary()
+    summary["app_version"] = APP_VERSION
+    return summary
 
 
 @app.get("/api/logs/errors")
@@ -586,9 +596,46 @@ async def delete_album(album_id: str):
     return result
 
 
+@app.get("/api/stream/{job_id}")
+async def stream_job(job_id: str):
+    """SSE endpoint -- streams real-time pipeline events to the frontend."""
+    from fastapi.responses import StreamingResponse
+    import json
+
+    # Create queue for this job if it doesn't exist
+    queue = get_job_queue(job_id)
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        # Send any existing job state immediately
+        if job_id in job_store:
+            job = job_store[job_id]
+            init_data = {"type": "status", "stage": job.get("stage", ""), "progress": job.get("progress", 0), "total": job.get("total", 0)}
+            yield "data: " + json.dumps(init_data) + "\n\n"
+
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                yield "data: " + json.dumps(event) + "\n\n"
+                if event.get("type") in ("done", "error", "preview_ready"):
+                    break
+            except asyncio.TimeoutError:
+                yield 'data: {"type": "ping"}\n\n'
+            except Exception:
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
 @app.get("/api/health")
 async def health():
-    return {"ok": True}
+    return {"ok": True, "version": APP_VERSION}
 
 
 from fastapi.responses import HTMLResponse
