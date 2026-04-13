@@ -119,27 +119,45 @@
     .stat-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
 
     /* Live scoring feed */
+    @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
     .scoring-feed { border: 1px solid var(--border); border-radius: 3px; overflow: hidden; background: var(--paper); }
-    .scoring-feed-header { padding: 8px 12px; background: var(--cream); border-bottom: 1px solid var(--border); font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; display: flex; justify-content: space-between; }
-    .scoring-feed-body { max-height: 240px; overflow-y: auto; }
-    .scoring-feed-body::-webkit-scrollbar { width: 4px; }
+    .scoring-feed-header { padding: 8px 14px; background: var(--cream); border-bottom: 1px solid var(--border); font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+    .scoring-feed-header .feed-live-dot { width: 6px; height: 6px; background: var(--amber); border-radius: 50%; display: inline-block; margin-right: 6px; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* Current photo hero card */
+    .score-current { display: none; padding: 14px; border-bottom: 1px solid var(--border); animation: slideIn 0.3s ease; }
+    .score-current.show { display: flex; gap: 14px; }
+    .score-current-thumb { width: 90px; height: 90px; object-fit: cover; border-radius: 3px; flex-shrink: 0; background: var(--cream); }
+    .score-current-thumb-placeholder { width: 90px; height: 90px; border-radius: 3px; flex-shrink: 0; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 32px; }
+    .score-current-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+    .score-current-label { font-size: 9px; font-family: 'DM Mono', monospace; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+    .score-current-narrative { font-size: 13px; color: var(--ink); line-height: 1.5; }
+    .score-current-verdict { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
+    .score-verdict-badge { font-size: 10px; font-family: 'DM Mono', monospace; font-weight: 500; padding: 2px 8px; border-radius: 2px; }
+    .score-verdict-badge.keep { background: #dcfce7; color: #166534; }
+    .score-verdict-badge.maybe { background: var(--amber-pale); color: #92400e; }
+    .score-verdict-badge.skip { background: #fee2e2; color: #991b1b; }
+    .score-verdict-badge.unflattering { background: var(--cream); color: var(--muted); }
+    .score-verdict-reason { font-size: 10px; color: var(--muted); font-style: italic; }
+
+    /* History strip */
+    .scoring-feed-body { max-height: 120px; overflow-y: auto; }
+    .scoring-feed-body::-webkit-scrollbar { width: 3px; }
     .scoring-feed-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-    .score-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); animation: fadeIn 0.3s ease; }
-    .score-item:last-child { border-bottom: none; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-    .score-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 2px; flex-shrink: 0; background: var(--cream); }
-    .score-thumb-placeholder { width: 40px; height: 40px; border-radius: 2px; flex-shrink: 0; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 16px; }
-    .score-info { flex: 1; min-width: 0; }
-    .score-filename { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .score-scene { font-size: 11px; color: var(--ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .score-badge { font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 500; padding: 2px 7px; border-radius: 2px; white-space: nowrap; flex-shrink: 0; }
-    .score-badge.high { background: #dcfce7; color: #166534; }
-    .score-badge.mid { background: var(--amber-pale); color: #92400e; }
-    .score-badge.low { background: #fee2e2; color: #991b1b; }
-    .score-badge.skip { background: var(--cream); color: var(--muted); }
-    .log-item { padding: 6px 12px; font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); border-bottom: 1px solid var(--border); animation: fadeIn 0.2s ease; }
+    .score-history-item { display: flex; align-items: center; gap: 9px; padding: 6px 14px; border-bottom: 1px solid var(--border); animation: slideIn 0.2s ease; opacity: 0.75; }
+    .score-history-item:last-child { border-bottom: none; }
+    .score-history-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+    .score-history-thumb-placeholder { width: 28px; height: 28px; border-radius: 2px; background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+    .score-history-text { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-history-badge { font-size: 10px; font-family: 'DM Mono', monospace; padding: 1px 6px; border-radius: 2px; flex-shrink: 0; }
+    .score-history-badge.keep { background: #dcfce7; color: #166534; }
+    .score-history-badge.maybe { background: var(--amber-pale); color: #92400e; }
+    .score-history-badge.skip { background: #fee2e2; color: #991b1b; }
+    .score-history-badge.unflattering { background: var(--cream); color: var(--muted); }
+    .log-item { padding: 6px 14px; font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); border-bottom: 1px solid var(--border); }
     .log-item:last-child { border-bottom: none; }
-    .log-item.error { color: #c94040; background: #fef2f2; }
 
     /* Preview */
     #preview-panel { display: none; }
@@ -331,9 +349,19 @@
       </div>
       <div class="scoring-feed" id="scoring-feed" style="display:none;">
         <div class="scoring-feed-header">
-          <span>Live scoring</span>
-          <span id="feed-count">0 photos</span>
+          <span><span class="feed-live-dot"></span>AI scoring in progress</span>
+          <span id="feed-count" style="font-size:10px;">0 of 0</span>
         </div>
+        <!-- Current photo hero -->
+        <div class="score-current" id="score-current">
+          <div class="score-current-thumb-placeholder" id="score-current-thumb-wrap">📷</div>
+          <div class="score-current-body">
+            <div class="score-current-label" id="score-current-label">Analyzing...</div>
+            <div class="score-current-narrative" id="score-current-narrative"></div>
+            <div class="score-current-verdict" id="score-current-verdict"></div>
+          </div>
+        </div>
+        <!-- History of scored photos -->
         <div class="scoring-feed-body" id="scoring-feed-body"></div>
       </div>
     </div>
@@ -892,7 +920,8 @@
       if (event.flattering && parseFloat(event.score) >= 6.0) passCount++;
       document.getElementById('stat-kept').textContent = feedCount.toLocaleString();
       document.getElementById('stat-pass').textContent = passCount.toLocaleString();
-      document.getElementById('feed-count').textContent = feedCount + ' scored';
+      const total = document.getElementById('stat-total').textContent;
+      document.getElementById('feed-count').textContent = feedCount + (total && total !== '—' ? ' of ' + total : '');
       document.getElementById('scoring-feed').style.display = 'block';
       addFeedScore(event);
       return;
@@ -918,40 +947,91 @@
     }
   }
 
+  let _lastStageMsg = '';
+
+  function buildNarrative(event) {
+    const score = parseFloat(event.score) || 0;
+    const scene = event.scene || '';
+    const flattering = event.flattering !== false;
+    const reason = event.unflattering_reason || '';
+
+    // Verdict
+    let verdict, verdictClass;
+    if (!flattering) {
+      verdict = '✕ Not including';
+      verdictClass = 'unflattering';
+    } else if (score >= 7.5) {
+      verdict = '✓ Great shot — including';
+      verdictClass = 'keep';
+    } else if (score >= 6.0) {
+      verdict = '✓ Good shot — including';
+      verdictClass = 'maybe';
+    } else {
+      verdict = '✕ Below threshold — skipping';
+      verdictClass = 'skip';
+    }
+
+    // Human narrative sentence
+    let narrative = scene ? scene.charAt(0).toUpperCase() + scene.slice(1) : 'Photo';
+    if (!flattering && reason) {
+      narrative += '. ' + reason.charAt(0).toUpperCase() + reason.slice(1) + '.';
+    }
+
+    return { verdict, verdictClass, narrative };
+  }
+
   function addFeedScore(event) {
+    const score = parseFloat(event.score) || 0;
+    const { verdict, verdictClass, narrative } = buildNarrative(event);
+
+    // Update hero card (current photo being scored)
+    const currentEl = document.getElementById('score-current');
+    const thumbWrap = document.getElementById('score-current-thumb-wrap');
+    const labelEl = document.getElementById('score-current-label');
+    const narrativeEl = document.getElementById('score-current-narrative');
+    const verdictEl = document.getElementById('score-current-verdict');
+
+    currentEl.classList.add('show');
+
+    // Thumbnail
+    if (event.thumb) {
+      thumbWrap.outerHTML = `<img id="score-current-thumb-wrap" class="score-current-thumb" src="data:image/jpeg;base64,${event.thumb}" alt="">`;
+    } else {
+      const el = document.getElementById('score-current-thumb-wrap');
+      if (el) el.textContent = '📷';
+    }
+
+    labelEl.textContent = `Photo ${feedCount} of ${document.getElementById('stat-total').textContent || '?'} · ${event.filename}`;
+    narrativeEl.textContent = narrative;
+    verdictEl.innerHTML = `<span class="score-verdict-badge ${verdictClass}">${verdict}</span>` +
+      (score && verdictClass !== 'unflattering' ? ` <span class="score-verdict-reason">${score.toFixed(1)} / 10</span>` : '');
+
+    // Push previous current to history strip
     const body = document.getElementById('scoring-feed-body');
     const item = document.createElement('div');
-    item.className = 'score-item';
-    const score = parseFloat(event.score) || 0;
-    const badgeClass = !event.flattering ? 'skip' : score >= 7 ? 'high' : score >= 5.5 ? 'mid' : 'low';
-    const badgeLabel = !event.flattering ? '✕ skip' : `${score.toFixed(1)}`;
-    const thumbHtml = event.thumb
-      ? `<img class="score-thumb" src="data:image/jpeg;base64,${event.thumb}" alt="">`
-      : `<div class="score-thumb-placeholder">📷</div>`;
-    item.innerHTML = `
-      ${thumbHtml}
-      <div class="score-info">
-        <div class="score-filename">${esc(event.filename)}</div>
-        <div class="score-scene">${esc(event.scene || 'analyzing...')}</div>
-      </div>
-      <span class="score-badge ${badgeClass}">${badgeLabel}</span>
-    `;
-    body.insertBefore(item, body.firstChild);  // newest on top
-    // Keep max 30 items
-    while (body.children.length > 30) body.removeChild(body.lastChild);
+    item.className = 'score-history-item';
+    const prevThumb = document.getElementById('score-current-thumb-wrap');
+    const thumbHtml = (prevThumb && prevThumb.tagName === 'IMG')
+      ? `<img class="score-history-thumb" src="${prevThumb.src}" alt="">`
+      : `<div class="score-history-thumb-placeholder">📷</div>`;
+    item.innerHTML = `${thumbHtml}<span class="score-history-text">${esc(narrative)}</span><span class="score-history-badge ${verdictClass}">${score > 0 ? score.toFixed(1) : '✕'}</span>`;
+    body.insertBefore(item, body.firstChild);
+    while (body.children.length > 20) body.removeChild(body.lastChild);
   }
 
   function addFeedLog(msg) {
-    // Only show significant stage changes, not every poll
-    const significant = ['Downloading', 'Clustering', 'AI scoring', 'scoring', 'Analyzing', 'narrative', 'Preview ready', 'Creating album', 'Adding', 'Generating'];
+    if (msg === _lastStageMsg) return;  // dedupe identical messages
+    _lastStageMsg = msg;
+    const significant = ['Downloading', 'Clustering', 'AI scoring', 'Analyzing', 'narrative', 'Preview ready', 'Creating album', 'Generating', 'thumbnails'];
     if (!significant.some(s => msg.includes(s))) return;
     const body = document.getElementById('scoring-feed-body');
-    if (!body || document.getElementById('scoring-feed').style.display === 'none') return;
+    const feed = document.getElementById('scoring-feed');
+    if (!body || !feed || feed.style.display === 'none') return;
     const item = document.createElement('div');
     item.className = 'log-item';
-    item.textContent = `↳ ${msg}`;
+    item.textContent = '↳ ' + msg;
     body.insertBefore(item, body.firstChild);
-    while (body.children.length > 30) body.removeChild(body.lastChild);
+    while (body.children.length > 20) body.removeChild(body.lastChild);
   }
 
   function pollUpload(jobId) {

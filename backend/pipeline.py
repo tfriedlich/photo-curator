@@ -525,6 +525,7 @@ CRITICAL FLATTERING CHECK:
                         "score": score_val,
                         "scene": scene_val,
                         "flattering": flattering_val,
+                        "unflattering_reason": result.get("unflattering_reason", ""),
                         "thumb": _thumb_b64,
                     })
             except Exception:
