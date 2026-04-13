@@ -70,8 +70,7 @@ def update_linked_album(album_id: str, album_name: str = None, description: str 
     if album_name:
         existing_meta["name"] = album_name
     if description:
-        existing_meta["narrative"] = description.replace("
-", " ")
+        existing_meta["narrative"] = description.replace("\n", " ")
     if cover_url:
         existing_meta["cover_url"] = cover_url
     existing_meta["last_updated"] = now
@@ -100,9 +99,7 @@ def update_album_manifest(album_id: str, filenames: list):
     new_entries = [f for f in filenames if f not in existing]
     if new_entries:
         with open(manifest_path, "a") as f:
-            f.write("
-".join(new_entries) + "
-")
+            f.write("\n".join(new_entries) + "\n")
         _get_logger().info(f"Manifest updated: {len(new_entries)} new, {len(existing) + len(new_entries)} total", album_id=album_id)
     return len(new_entries)
 
