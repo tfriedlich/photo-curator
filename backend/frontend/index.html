@@ -870,7 +870,7 @@
     const albumId = job.album_id || tripState?.albumId || '';
 
     saveTripState(albumId, albumUrl, albumName, job.kept);
-    await loadAlbumHistory();
+    loadAlbumHistory().catch(() => {});
 
     const isFirst = tripState.tranchesAdded === 1;
     document.getElementById('result-title').textContent = isFirst ? 'Album created!' : 'Day added to album';
