@@ -20,10 +20,6 @@ APP_VERSION = "v24"
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info(f"Photo Curator {APP_VERSION} starting up")
-
 REDIRECT_URI = f"{config.APP_BASE_URL}/auth/callback"
 GOOGLE_SCOPES = " ".join([
     "https://www.googleapis.com/auth/photoslibrary.appendonly",
@@ -32,6 +28,26 @@ GOOGLE_SCOPES = " ".join([
 
 UPLOAD_DIR = Path("/tmp/photo-curator/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Per-job SSE event queues
+import asyncio
+from typing import AsyncGenerator
+
+job_event_queues: dict = {}
+
+def get_job_queue(job_id: str) -> asyncio.Queue:
+    if job_id not in job_event_queues:
+        job_event_queues[job_id] = asyncio.Queue(maxsize=200)
+    return job_event_queues[job_id]
+
+def push_job_event(job_id: str, event: dict):
+    """Push an event to the job's SSE queue (non-blocking)."""
+    import json
+    if job_id in job_event_queues:
+        try:
+            job_event_queues[job_id].put_nowait(event)
+        except Exception:
+            pass
 
 # Structured in-memory logger
 from collections import deque
@@ -118,6 +134,10 @@ class AppLogger:
         }
 
 logger = AppLogger()
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"Photo Curator {APP_VERSION} starting up")
 
 # Keep backward compat
 def log(msg: str):
