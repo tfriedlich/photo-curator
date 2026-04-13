@@ -27,6 +27,95 @@ GOOGLE_SCOPES = " ".join([
 UPLOAD_DIR = Path("/tmp/photo-curator/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Structured in-memory logger
+from collections import deque
+import datetime
+
+class AppLogger:
+    def __init__(self, maxlen=1000):
+        self._entries = deque(maxlen=maxlen)
+        self._session_id = None
+
+    def _write(self, level: str, msg: str, context: dict = None):
+        entry = {
+            "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "level": level,
+            "msg": msg,
+        }
+        if context:
+            entry["ctx"] = context
+        if self._session_id:
+            entry["session"] = self._session_id
+        self._entries.append(entry)
+        prefix = f"[{level}]"
+        if self._session_id:
+            prefix += f"[{self._session_id[:8]}]"
+        print(f"{entry['ts']} {prefix} {msg}", flush=True)
+        return entry
+
+    def info(self, msg: str, **ctx): return self._write("INFO", msg, ctx or None)
+    def warn(self, msg: str, **ctx): return self._write("WARN", msg, ctx or None)
+    def error(self, msg: str, **ctx): return self._write("ERROR", msg, ctx or None)
+    def score(self, filename: str, score: float, scene: str, flattering: bool, **ctx):
+        return self._write("SCORE", f"{filename}: {score} | {scene} | flattering={flattering}", ctx or None)
+
+    def set_session(self, session_id: str):
+        self._session_id = session_id
+
+    def clear_session(self):
+        self._session_id = None
+
+    def get_entries(self, n: int = 200, level: str = None, session: str = None):
+        entries = list(self._entries)
+        if level:
+            entries = [e for e in entries if e["level"] == level]
+        if session:
+            entries = [e for e in entries if e.get("session", "").startswith(session)]
+        return entries[-n:]
+
+    def get_last_session_summary(self):
+        """Summarize the most recent job session for debugging."""
+        entries = list(self._entries)
+        if not entries:
+            return {"error": "No log entries yet"}
+
+        # Find the most recent session
+        sessions = list(dict.fromkeys(
+            e["session"] for e in entries if "session" in e
+        ))
+        if not sessions:
+            return {"error": "No sessions logged yet"}
+
+        last_session = sessions[-1]
+        session_entries = [e for e in entries if e.get("session") == last_session]
+        errors = [e for e in session_entries if e["level"] == "ERROR"]
+        warnings = [e for e in session_entries if e["level"] == "WARN"]
+        scores = [e for e in session_entries if e["level"] == "SCORE"]
+
+        return {
+            "session_id": last_session,
+            "started": session_entries[0]["ts"] if session_entries else None,
+            "ended": session_entries[-1]["ts"] if session_entries else None,
+            "total_entries": len(session_entries),
+            "errors": [e["msg"] for e in errors],
+            "warnings": [e["msg"] for e in warnings],
+            "scores_count": len(scores),
+            "score_range": {
+                "min": min((float(e["msg"].split(":")[1].split("|")[0].strip()) for e in scores), default=None),
+                "max": max((float(e["msg"].split(":")[1].split("|")[0].strip()) for e in scores), default=None),
+            } if scores else None,
+            "last_stage": next(
+                (e["msg"] for e in reversed(session_entries) if e["level"] == "INFO" and e["msg"].startswith("[JOB]")),
+                None
+            ),
+        }
+
+logger = AppLogger()
+
+# Keep backward compat
+def log(msg: str):
+    logger.info(msg)
+
 token_store: dict = {
     "access_token": os.environ.get("GOOGLE_PHOTOS_TOKEN", ""),
     "refresh_token": os.environ.get("GOOGLE_REFRESH_TOKEN", ""),
@@ -154,6 +243,8 @@ async def upload_zip(
     }
 
     access_token = await get_valid_token()
+    logger.set_session(job_id)
+    logger.info(f"[JOB] Starting ZIP curation", album=album_name, filename=file.filename)
     background_tasks.add_task(run_pipeline_from_zip, job_id, zip_path, album_name, access_token)
     return {"job_id": job_id}
 
@@ -384,11 +475,48 @@ async def curate_from_picker(
         "album_name": album_name,
     }
 
+    logger.set_session(job_id)
+    logger.info(f"[JOB] Starting picker curation", album=album_name, photos_selected="pending")
     background_tasks.add_task(
         run_pipeline_from_picker,
         job_id, session_id, album_name, access_token
     )
     return {"job_id": job_id}
+
+
+@app.get("/api/logs")
+async def get_logs(n: int = 200, level: str = None, session: str = None):
+    """Return structured log entries for debugging."""
+    entries = logger.get_entries(n=n, level=level, session=session)
+    return {"entries": entries, "count": len(entries)}
+
+
+@app.get("/api/logs/summary")
+async def get_log_summary():
+    """Return a human-readable summary of the last run -- great for debugging failures."""
+    return logger.get_last_session_summary()
+
+
+@app.get("/api/logs/errors")
+async def get_errors(n: int = 50):
+    """Return only error entries across all sessions."""
+    entries = logger.get_entries(n=n, level="ERROR")
+    return {"errors": entries, "count": len(entries)}
+
+
+class FrontendLogEntry(BaseModel):
+    level: str = "ERROR"
+    msg: str
+    ctx: dict = {}
+
+@app.post("/api/logs/frontend")
+async def log_frontend(entry: FrontendLogEntry):
+    """Receive frontend errors and store in the same log buffer."""
+    if entry.level == "ERROR":
+        logger.error(f"[FRONTEND] {entry.msg}", **entry.ctx)
+    else:
+        logger.info(f"[FRONTEND] {entry.msg}", **entry.ctx)
+    return {"ok": True}
 
 
 @app.get("/api/health")

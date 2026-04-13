@@ -339,6 +339,30 @@
 
 <script>
   const API = window.location.origin;
+
+  // Global frontend error handler -- sends JS errors to backend logger
+  window.addEventListener('error', (e) => {
+    fetch(`${API}/api/logs/frontend`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        level: 'ERROR',
+        msg: `JS Error: ${e.message}`,
+        ctx: { file: e.filename, line: e.lineno, col: e.colno }
+      })
+    }).catch(() => {});
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    fetch(`${API}/api/logs/frontend`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        level: 'ERROR',
+        msg: `Unhandled Promise rejection: ${e.reason}`,
+      })
+    }).catch(() => {});
+  });
   const STORAGE_KEY = 'photo_curator_trip';
   let selectedFile = null;
   let pollInterval = null;
@@ -780,7 +804,16 @@
     showSection('success');
   }
 
-  function showError(msg) { document.getElementById('error-msg').textContent = msg; showSection('error'); }
+  function showError(msg) {
+    document.getElementById('error-msg').textContent = msg;
+    showSection('error');
+    // Report to backend logger
+    fetch(`${API}/api/logs/frontend`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ level: 'ERROR', msg: `Frontend error: ${msg}` })
+    }).catch(() => {});
+  }
 
   function showSection(name) {
     document.getElementById('progress-divider').style.display = 'none';

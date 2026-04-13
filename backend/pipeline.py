@@ -277,7 +277,7 @@ CRITICAL FLATTERING CHECK:
             )
             resp_data = r.json()
             if "error" in resp_data:
-                print(f"[SCORE] Anthropic API error: {resp_data['error']}", flush=True)
+                _get_logger().error(f"Anthropic API error: {resp_data['error'].get('message', str(resp_data['error']))}")
                 return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
 
             text = resp_data["content"][0]["text"].strip()
@@ -286,10 +286,15 @@ CRITICAL FLATTERING CHECK:
                 if text.startswith("json"):
                     text = text[4:]
             result = json.loads(text.strip())
-            print(f"[SCORE] {path.name}: {result.get('score')} | {result.get('scene')} | flattering={result.get('flattering')}", flush=True)
+            _get_logger().score(
+                path.name,
+                result.get("score", 5.0),
+                result.get("scene", "unknown"),
+                result.get("flattering", True),
+            )
             return result
     except Exception as e:
-        print(f"[SCORE] Exception scoring {path.name}: {e}", flush=True)
+        _get_logger().error(f'Exception scoring {path.name}: {e}')
         return {"score": 5.0, "scene": "unknown", "flattering": True, "unflattering_reason": None, "enhance_notes": None}
 
 
