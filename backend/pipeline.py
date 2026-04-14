@@ -470,12 +470,11 @@ SCORE 9-10 (excellent -- must include):
 - Great composition AND people look great
 - Will be treasured for years
 
-CRITICAL FLATTERING CHECK:
-- If ANY person has their back to camera: flattering=false
-- If ANY person is looking down or away: flattering=false  
-- If ANY person has eyes closed or bad expression: flattering=false
-- If lighting makes anyone look bad: flattering=false
-- Only flattering=true if ALL visible people look good"""
+FLATTERING CHECK (only applies to people-focused shots):
+- Set flattering=false ONLY if this is a people-focused shot AND any person has eyes closed, bad expression, or unflattering lighting
+- For scenic shots, landscapes, action shots, silhouettes, or shots where faces aren't the focus: flattering=true
+- "Back to camera" is fine for candid/action/scenic shots -- only set false if it's clearly a failed portrait attempt
+- When in doubt for non-portrait shots: flattering=true"""
 
         payload = {
             "model": "claude-haiku-4-5-20251001",
@@ -833,6 +832,22 @@ async def run_pipeline(job_id, start_date, end_date, album_name, access_token, c
                 pct = 32 + int((i / len(path_item_pairs)) * 12)
                 update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{len(path_item_pairs)})")
 
+
+        # Resolve "unknown" dates: assign based on neighboring photos by filename order
+        known_dates = [img["day"] for img in images if img["day"] != "unknown"]
+        if known_dates:
+            from collections import Counter as _Counter
+            most_common_date = _Counter(known_dates).most_common(1)[0][0]
+            images_sorted = sorted(images, key=lambda x: x["filename"])
+            for i, img in enumerate(images_sorted):
+                if img["day"] != "unknown":
+                    continue
+                neighbor_dates = []
+                for j in range(max(0, i-5), min(len(images_sorted), i+6)):
+                    if j != i and images_sorted[j]["day"] != "unknown":
+                        neighbor_dates.append(images_sorted[j]["day"])
+                img["day"] = _Counter(neighbor_dates).most_common(1)[0][0] if neighbor_dates else most_common_date
+            images = images_sorted
         images = [img for img in images if img["blur"] > config.MIN_BLUR_SCORE and img["exposure"] > config.MIN_EXPOSURE_SCORE]
 
         # 4. Cluster

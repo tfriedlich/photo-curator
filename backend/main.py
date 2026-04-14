@@ -15,7 +15,7 @@ import config
 from pipeline import run_pipeline, confirm_and_upload, enhance_photo, pick_best_from_cluster
 from state import job_store
 
-APP_VERSION = "v24n"
+APP_VERSION = "v24r"
 
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -48,7 +48,7 @@ class AppLogger:
             "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "level": level,
             "msg": msg,
-            "v": "v24n",
+            "v": "v24r",
         }
         if context:
             entry["ctx"] = context
@@ -665,6 +665,143 @@ async def stream_job(job_id: str):
     )
 
 
+class RefineRequest(BaseModel):
+    feedback: str
+
+@app.post("/api/preview/{job_id}/refine")
+async def refine_preview(job_id: str, req: RefineRequest, background_tasks: BackgroundTasks):
+    """Re-analyze rejected candidates based on natural language feedback."""
+    job = job_store.get(job_id)
+    if not job or job.get("status") not in ("preview_ready",):
+        raise HTTPException(400, "Preview not ready")
+    if not req.feedback.strip():
+        raise HTTPException(400, "Feedback is required")
+    # Run refinement in background so SSE can stream progress
+    get_job_queue(job_id)
+    background_tasks.add_task(run_refinement, job_id, req.feedback.strip())
+    return {"ok": True, "message": "Refinement started"}
+
+
+async def run_refinement(job_id: str, feedback: str):
+    """Ask Claude to promote rejected candidates based on user feedback."""
+    import json as _json
+    job = job_store.get(job_id)
+    if not job:
+        return
+
+    rejected = job.get("rejected_candidates", [])
+    work_dir = job.get("work_dir", "")
+    preview = job.get("preview", {})
+    current_keepers = {p["filename"] for t in preview.get("tranches", []) for p in t.get("photos", []) if not p.get("removed")}
+
+    push_job_event(job_id, {"type": "refine_start", "total": len(rejected), "feedback": feedback})
+
+    if not rejected:
+        push_job_event(job_id, {"type": "refine_done", "added": 0, "removed": 0, "message": "No rejected candidates to search through."})
+        return
+
+    # Build a summary of rejected candidates for Claude
+    rejected_summary = []
+    for i, img in enumerate(rejected[:200]):  # Cap at 200 for prompt size
+        rejected_summary.append(f'{i}: {img["filename"]} | score:{img["score"]} | scene:"{img["scene"]}" | flattering:{img["flattering"]}')
+
+    keeper_summary = []
+    for t in preview.get("tranches", []):
+        for p in t.get("photos", []):
+            if not p.get("removed"):
+                keeper_summary.append(f'{p["filename"]} | score:{p["score"]} | scene:"{p["scene"]}"')
+
+    prompt = f"""You are helping curate a family vacation photo album. The user has reviewed the current selection and given this feedback:
+
+"{feedback}"
+
+CURRENT SELECTIONS ({len(keeper_summary)} photos):
+{chr(10).join(keeper_summary[:50])}
+
+REJECTED PHOTOS available to promote ({len(rejected_summary)} photos):
+{chr(10).join(rejected_summary)}
+
+Based on the feedback, respond with ONLY valid JSON:
+{{
+  "add": [<list of filenames to add from rejected list>],
+  "remove": [<list of filenames to remove from current selections, ONLY if feedback explicitly requests removal>],
+  "message": "<brief explanation of what you're doing, 1 sentence>"
+}}
+
+Rules:
+- ONLY add photos that genuinely match the feedback
+- ONLY remove photos if the feedback EXPLICITLY targets specific photos for removal (e.g. "remove the one with sunglasses")
+- Vague feedback like "more of X" means ADD more, never remove
+- Keep additions focused -- quality over quantity, max 10 additions unless feedback asks for more
+- If nothing matches the feedback, return empty arrays with an explanation"""
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": config.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-sonnet-4-6", "max_tokens": 800,
+                      "messages": [{"role": "user", "content": prompt}]},
+            )
+            resp = r.json()
+            if "error" in resp or "content" not in resp:
+                raise Exception(resp.get("error", {}).get("message", "API error"))
+            text = resp["content"][0]["text"].strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"): text = text[4:]
+            result = _json.loads(text.strip())
+
+        to_add = result.get("add", [])
+        to_remove = result.get("remove", [])
+        message = result.get("message", "")
+
+        # Apply additions to preview
+        rejected_map = {img["filename"]: img for img in rejected}
+        added_count = 0
+        for filename in to_add:
+            if filename not in rejected_map:
+                continue
+            img = rejected_map[filename]
+            # Find or create the right tranche
+            day = img.get("day", "unknown")
+            tranches = preview.get("tranches", [])
+            target_tranche = next((t for t in tranches if t["date"] == day), None)
+            if not target_tranche:
+                target_tranche = {"date": day, "day_name": day, "photos_found": 0, "photos": []}
+                tranches.append(target_tranche)
+            # Add photo with a "refined" flag
+            target_tranche["photos"].append({
+                "id": filename, "filename": filename,
+                "score": img["score"], "scene": img["scene"],
+                "enhance_notes": None, "has_alternatives": False,
+                "enhanced": False, "removed": False,
+                "cluster_idx": img.get("cluster_idx", -1),
+                "refined": True,  # mark as added by refinement
+            })
+            # Remove from rejected list so it's not offered again
+            job["rejected_candidates"] = [c for c in job.get("rejected_candidates", []) if c["filename"] != filename]
+            added_count += 1
+            push_job_event(job_id, {"type": "refine_add", "filename": filename, "scene": img["scene"], "score": img["score"]})
+
+        # Apply removals (only explicit ones)
+        removed_count = 0
+        for filename in to_remove:
+            for tranche in preview.get("tranches", []):
+                for photo in tranche.get("photos", []):
+                    if photo["filename"] == filename and not photo.get("removed"):
+                        photo["removed"] = True
+                        removed_count += 1
+                        push_job_event(job_id, {"type": "refine_remove", "filename": filename})
+
+        push_job_event(job_id, {"type": "refine_done", "added": added_count, "removed": removed_count, "message": message})
+        logger.info(f"Refinement complete: +{added_count} -{removed_count}", session=job_id)
+
+    except Exception as e:
+        logger.error(f"Refinement failed: {e}", session=job_id)
+        push_job_event(job_id, {"type": "refine_done", "added": 0, "removed": 0, "message": f"Refinement failed: {e}"})
+
+
 @app.get("/api/health")
 async def health():
     return {"ok": True, "version": APP_VERSION}
@@ -763,7 +900,7 @@ async def run_pipeline_from_zip(job_id: str, zip_path: Path, album_name: str, ac
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=42)
         scored = []
         for i, img in enumerate(candidates):
-            result = await score_with_claude(img["path"])
+            result = await score_with_claude(img["path"], job_id=job_id)
             img["claude_result"] = result
             img["score"] = result.get("score", 5.0)
             img["flattering"] = result.get("flattering", True)
@@ -971,6 +1108,34 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
                 pct = 34 + int((i / len(image_paths)) * 10)
                 update_job(job_id, progress=pct, stage=f"Analyzing photos ({i}/{len(image_paths)})")
 
+        # Resolve unknown dates before filtering
+
+        # Resolve "unknown" dates: assign based on neighboring photos by filename order
+        # (phones name files sequentially so IMG_1234 and IMG_1236 are usually same day)
+        known_dates = [img["day"] for img in images if img["day"] != "unknown"]
+        if known_dates:
+            from collections import Counter
+            most_common_date = Counter(known_dates).most_common(1)[0][0]
+            # Sort by filename for neighbor lookup
+            images_sorted = sorted(images, key=lambda x: x["filename"])
+            for i, img in enumerate(images_sorted):
+                if img["day"] != "unknown":
+                    continue
+                # Look at up to 5 neighbors each side for a known date
+                neighbor_dates = []
+                for j in range(max(0, i-5), min(len(images_sorted), i+6)):
+                    if j != i and images_sorted[j]["day"] != "unknown":
+                        neighbor_dates.append(images_sorted[j]["day"])
+                if neighbor_dates:
+                    # Use nearest known neighbor (most frequent among close neighbors)
+                    img["day"] = Counter(neighbor_dates).most_common(1)[0][0]
+                    img["dt"] = img["dt"]  # keep None dt, just fix the day string
+                else:
+                    # No neighbors with known dates -- use session's most common date
+                    img["day"] = most_common_date
+        # Re-sync images list order after sort (images list may have been reordered)
+        images = images_sorted if known_dates else images
+
         images = [img for img in images
                   if img["blur"] > config.MIN_BLUR_SCORE and img["exposure"] > config.MIN_EXPOSURE_SCORE]
 
@@ -997,7 +1162,7 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
         update_job(job_id, stage=f"AI scoring {len(candidates)} candidates", progress=50)
         scored = []
         for i, img in enumerate(candidates):
-            result = await score_with_claude(img["path"])
+            result = await score_with_claude(img["path"], job_id=job_id)
             img["claude_result"] = result
             img["score"] = result.get("score", 5.0)
             img["flattering"] = result.get("flattering", True)
@@ -1088,11 +1253,25 @@ async def run_pipeline_from_picker(job_id: str, session_id: str, album_name: str
         if 'picker_id_map' in locals():
             filename_to_picker_id = {path.name: pid for pid, path in picker_id_map.items()}
 
+        keeper_filenames = {img["filename"] for img in keepers}
+        rejected = [img for img in pre_keepers if img["filename"] not in keeper_filenames]
+        # Also include photos that didn't make pre_keepers (scored but below threshold)
+        scored_filenames = {img["filename"] for img in pre_keepers}
+        all_scored_flat = [img for cluster in clusters for img in cluster if img.get("score") is not None]
+        below_threshold = [img for img in all_scored_flat if img["filename"] not in scored_filenames and img["filename"] not in keeper_filenames]
+        rejected_serializable = [{"filename": img["filename"], "path": str(img["path"]),
+                                   "score": round(img.get("score", 0), 1),
+                                   "scene": img.get("scene", ""), "day": img.get("day", "unknown"),
+                                   "flattering": img.get("flattering", True),
+                                   "cluster_idx": img.get("cluster_idx", -1)}
+                                  for img in rejected + below_threshold]
+
         update_job(job_id, status="preview_ready", stage="Preview ready", progress=90,
                    kept=len(keepers),
                    picker_ids=list(filename_to_picker_id.values()),
                    preview={"album_name": album_name, "total_found": total_found, "tranches": preview_days},
                    all_clusters=all_clusters_serializable,
+                   rejected_candidates=rejected_serializable,
                    picker_id_map=filename_to_picker_id,
                    work_dir=str(work_dir))
 

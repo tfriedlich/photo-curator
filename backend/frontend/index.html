@@ -907,6 +907,7 @@
 
   function handlePipelineEvent(event, jobId) {
     if (event.type === 'ping') return;
+    if (event.type && event.type.startsWith('refine_')) { handleRefineEvent(event); return; }
 
     if (event.stage) {
       document.getElementById('stage-label').textContent = event.stage;
@@ -1073,6 +1074,7 @@
       previewState = preview;
       renderPreview(jobId);
       showSection('preview');
+    document.getElementById('refine-panel').style.display = 'block';
     } catch(e) { showError('Could not load preview: ' + e.message); }
   }
 
@@ -1279,6 +1281,124 @@
 
   function formatDate(d) { return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'}); }
   function showToast(msg) { const t = document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
+  // ── Refinement ──
+  let refineHistory = [];
+
+  async function submitRefinement() {
+    const input = document.getElementById('refine-input');
+    const btn = document.getElementById('refine-btn');
+    const status = document.getElementById('refine-status');
+    const feedback = input.value.trim();
+    if (!feedback || !currentJobId) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    setRefineStatus('working', '↻ Searching ' + (previewState?.total_found || '') + ' photos for matches...');
+
+    try {
+      const r = await fetch(`${API}/api/preview/${currentJobId}/refine`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({feedback}),
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || 'Refinement failed');
+      // SSE events handle the response
+      input.value = '';
+      input.style.height = 'auto';
+    } catch(e) {
+      setRefineStatus('', 'Error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Refine →';
+    }
+  }
+
+  function setRefineStatus(type, msg) {
+    const el = document.getElementById('refine-status');
+    el.textContent = msg;
+    el.className = 'refine-status show' + (type ? ' ' + type : '');
+  }
+
+  function handleRefineEvent(event) {
+    const btn = document.getElementById('refine-btn');
+    const history = document.getElementById('refine-history');
+
+    if (event.type === 'refine_start') {
+      setRefineStatus('working', '↻ Analyzing ' + event.total + ' candidate photos...');
+      return;
+    }
+    if (event.type === 'refine_add') {
+      // Add the photo to the preview grid
+      addRefinedPhoto(event.filename, event.scene, event.score);
+      return;
+    }
+    if (event.type === 'refine_remove') {
+      // Mark photo as removed
+      removePhotoFromPreview(event.filename);
+      return;
+    }
+    if (event.type === 'refine_done') {
+      btn.disabled = false;
+      btn.textContent = 'Refine →';
+      const parts = [];
+      if (event.added > 0) parts.push('+' + event.added + ' added');
+      if (event.removed > 0) parts.push('-' + event.removed + ' removed');
+      const summary = parts.length ? parts.join(', ') : 'No changes';
+      const msg = event.message ? event.message + ' (' + summary + ')' : summary;
+      setRefineStatus(event.added > 0 || event.removed > 0 ? 'success' : '', msg);
+
+      // Add to history
+      if (event.message) {
+        refineHistory.unshift(msg);
+        history.classList.add('show');
+        history.innerHTML = refineHistory.slice(0, 5).map(h =>
+          '<div class="refine-history-item">✦ ' + esc(h) + '</div>'
+        ).join('');
+      }
+      // Update kept count
+      updateRatioCount();
+    }
+  }
+
+  function addRefinedPhoto(filename, scene, score) {
+    // Find the first tranche grid and add to it (or find by date if available)
+    const grids = document.querySelectorAll('.photo-grid');
+    if (!grids.length) return;
+    const grid = grids[grids.length - 1]; // add to last tranche for now
+    const card = document.createElement('div');
+    card.className = 'photo-card';
+    card.id = 'photo-' + filename;
+    card.innerHTML = `
+      <div class="photo-thumb-wrap">
+        <img class="photo-thumb" src="${API}/api/preview/${currentJobId}/thumb/${encodeURIComponent(filename)}" 
+             onerror="this.src=''">
+        <button class="photo-remove-btn" onclick="removePhoto('unknown', '${esc(filename)}', this)" title="Remove">✕</button>
+      </div>
+      <div class="photo-meta">
+        <span class="photo-scene">${esc(scene)}</span>
+        <span class="photo-refined-badge">+refined</span>
+        <span class="photo-score">${score}</span>
+      </div>`;
+    grid.appendChild(card);
+
+    // Also update previewState
+    if (previewState && previewState.tranches && previewState.tranches.length > 0) {
+      const lastTranche = previewState.tranches[previewState.tranches.length - 1];
+      lastTranche.photos.push({id: filename, filename, score, scene, removed: false, refined: true, enhanced: false});
+    }
+  }
+
+  function removePhotoFromPreview(filename) {
+    const card = document.getElementById('photo-' + filename);
+    if (card) card.style.opacity = '0.3';
+    if (previewState) {
+      for (const t of previewState.tranches) {
+        for (const p of t.photos) {
+          if (p.filename === filename) { p.removed = true; break; }
+        }
+      }
+    }
+  }
+
   function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 </body>
