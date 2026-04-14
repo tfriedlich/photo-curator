@@ -507,18 +507,22 @@ FLATTERING CHECK (only applies to people-focused shots):
             scene_val = result.get("scene", "unknown")
             flattering_val = result.get("flattering", True)
             _get_logger().score(path.name, score_val, scene_val, flattering_val)
-            # Push score event with base64 thumbnail for live preview
-            try:
-                from state import push_job_event
-                import base64 as _b64
-                from PIL import Image as _Img
-                import io as _io
-                _thumb = _Img.open(path).convert("RGB")
-                _thumb.thumbnail((120, 120))
-                _buf = _io.BytesIO()
-                _thumb.save(_buf, "JPEG", quality=60)
-                _thumb_b64 = _b64.b64encode(_buf.getvalue()).decode()
-                if job_id:
+            # Push score event -- generate thumbnail, tolerating HEIC/format failures
+            if job_id:
+                try:
+                    from state import push_job_event
+                    import base64 as _b64
+                    import io as _io
+                    from PIL import Image as _Img
+                    _thumb_b64 = None
+                    try:
+                        _thumb = _Img.open(path).convert("RGB")
+                        _thumb.thumbnail((120, 120))
+                        _buf = _io.BytesIO()
+                        _thumb.save(_buf, "JPEG", quality=60)
+                        _thumb_b64 = _b64.b64encode(_buf.getvalue()).decode()
+                    except Exception:
+                        pass  # HEIC or unsupported format -- send event without thumb
                     push_job_event(job_id, {
                         "type": "score",
                         "filename": path.name,
@@ -528,8 +532,8 @@ FLATTERING CHECK (only applies to people-focused shots):
                         "unflattering_reason": result.get("unflattering_reason", ""),
                         "thumb": _thumb_b64,
                     })
-            except Exception as _push_err:
-                _get_logger().error(f"Score event push failed for {path.name}: {_push_err}")
+                except Exception as _push_err:
+                    _get_logger().error(f"Score event push failed for {path.name}: {_push_err}")
             return result
     except Exception as e:
         _get_logger().error(f'Exception scoring {path.name}: {e}')

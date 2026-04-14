@@ -13,9 +13,16 @@ import shutil
 
 import config
 from pipeline import run_pipeline, confirm_and_upload, enhance_photo, pick_best_from_cluster
+
+# Register HEIC support so Pillow can open .heic/.heif files
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
 from state import job_store
 
-APP_VERSION = "v24s"
+APP_VERSION = "v24u"
 
 app = FastAPI(title="Photo Curator")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -48,7 +55,7 @@ class AppLogger:
             "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "level": level,
             "msg": msg,
-            "v": "v24s",
+            "v": "v24u",
         }
         if context:
             entry["ctx"] = context

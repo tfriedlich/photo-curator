@@ -113,7 +113,8 @@
     .stage-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink); margin-bottom: 12px; }
     .progress-track { height: 4px; background: var(--cream); border-radius: 2px; overflow: hidden; margin-bottom: 18px; }
     .progress-fill { height: 100%; background: var(--amber); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
-    .stats-row { display: flex; gap: 16px; margin-bottom: 18px; }
+    .stats-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat { flex: 1; min-width: 80px; }
     .stat { flex: 1; background: var(--paper); border: 1px solid var(--border); border-radius: 3px; padding: 12px 14px; }
     .stat-value { font-family: 'Playfair Display', serif; font-size: 26px; color: var(--ink); line-height: 1; margin-bottom: 3px; }
     .stat-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; }
@@ -671,13 +672,13 @@
         }
       }
     }
-    document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
+    { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = 'Add to Album →'; }
   }
 
   function continueTrip() {
     // Already set up -- just hide banner context, user picks photos
     showToast(`Adding to "${tripState.albumName}"`);
-    document.getElementById('confirm-btn-label').textContent = `Add to "${tripState.albumName}" →`;;
+    { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = `Add to "${tripState.albumName}" →`; }
   }
 
   function confirmNewTrip() {
@@ -692,7 +693,7 @@
         if (newRow) newRow.classList.add('show');
         if (meta) { meta.classList.remove('show'); meta.textContent = ''; }
       }
-      document.getElementById('confirm-btn-label').textContent = 'Create Album →';
+      { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = 'Create Album →'; }
     }
   }
 
@@ -700,9 +701,9 @@
     showSection('none');
     document.getElementById('zip-submit-btn').disabled = selectedFile ? false : true;
     document.getElementById('picker-btn').disabled = !googleConnected;
-    document.getElementById('confirm-btn').disabled = false;
-    document.getElementById('confirm-btn').textContent = 'Add to Album →';
-    document.getElementById('confirm-btn-label').textContent = 'Add to Album →';
+    { const _b = document.getElementById('confirm-btn'); if (_b) _b.disabled = false; }
+    { const _b = document.getElementById('confirm-btn'); if (_b) _b.textContent = 'Add to Album →'; }
+    { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = 'Add to Album →'; }
     selectedFile = null;
     document.getElementById('file-input').value = '';
     document.getElementById('file-selected').classList.remove('show');
@@ -723,7 +724,7 @@
     document.getElementById('file-selected').classList.remove('show');
     document.getElementById('zip-submit-btn').disabled = true;
     document.getElementById('picker-btn').disabled = !googleConnected;
-    document.getElementById('confirm-btn-label').textContent = 'Create Album →';
+    { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = 'Create Album →'; }
     clearInterval(pollInterval);
     clearInterval(pickerPollInterval);
     if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
@@ -1208,7 +1209,7 @@
   async function confirmAlbum() {
     const btn = document.getElementById('confirm-btn');
     btn.disabled = true;
-    document.getElementById('confirm-btn-label').textContent = tripState ? `Adding to "${tripState.albumName}"...` : 'Creating album...';
+    { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = tripState ? `Adding to "${tripState.albumName}"...` : 'Creating album...'; }
 
     // Use existing album if trip in progress
     const existingAlbumId = tripState?.albumId || '';
@@ -1225,7 +1226,7 @@
       document.getElementById('uploading-title').textContent = tripState ? 'Adding to your album...' : 'Creating your album...';
       showSection('uploading');
       pollUpload(currentJobId);
-    } catch(e) { showError(e.message); btn.disabled = false; document.getElementById('confirm-btn-label').textContent = 'Add to Album →'; }
+    } catch(e) { showError(e.message); btn.disabled = false; { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = 'Add to Album →'; } }
   }
 
   function backToForm() { showSection('none'); document.getElementById('zip-submit-btn').disabled = selectedFile ? false : true; document.getElementById('picker-btn').disabled = !googleConnected; }
@@ -1283,11 +1284,11 @@
     document.getElementById('progress-fill').style.width = '0%';
     document.getElementById('stat-total').textContent = '—';
     document.getElementById('stat-kept').textContent = '—';
-    document.getElementById('confirm-btn').disabled = false;
+    { const _b = document.getElementById('confirm-btn'); if (_b) _b.disabled = false; }
     const btnLabel = tripState
       ? `Add to "${tripState.albumName}" →`
       : 'Create New Album →';
-    document.getElementById('confirm-btn-label').textContent = btnLabel;
+    { const _l = document.getElementById('confirm-btn-label'); if (_l) _l.textContent = btnLabel; }
     showSection('none');
     clearInterval(pollInterval);
     clearInterval(pickerPollInterval);

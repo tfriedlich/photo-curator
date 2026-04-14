@@ -6,3 +6,4 @@ Pillow==10.4.0
 opencv-python-headless==4.10.0.84
 imagehash==4.3.1
 numpy==1.26.4
+pillow-heif==0.18.0
