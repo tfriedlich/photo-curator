@@ -381,6 +381,20 @@
         </div>
       </div>
       <div class="preview-days" id="preview-days"></div>
+      <!-- Refinement panel -->
+      <div class="refine-panel" id="refine-panel" style="display:none;">
+        <span class="refine-label">✦ Refine your selection</span>
+        <div class="refine-row">
+          <textarea class="refine-input" id="refine-input" rows="1"
+            placeholder="e.g. &quot;I'd like more pictures of my younger daughter&quot; or &quot;find shots showing the volcano view&quot;"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitRefinement()}"></textarea>
+          <button class="refine-btn" id="refine-btn" onclick="submitRefinement()">Refine →</button>
+        </div>
+        <div class="refine-status" id="refine-status"></div>
+        <div class="refine-history" id="refine-history"></div>
+      </div>
+
       <div class="confirm-bar">
         <div class="confirm-summary" id="confirm-summary"></div>
         <button class="btn-back" onclick="backToForm()">← Back</button>
@@ -1074,7 +1088,7 @@
       previewState = preview;
       renderPreview(jobId);
       showSection('preview');
-    document.getElementById('refine-panel').style.display = 'block';
+    const _rp = document.getElementById('refine-panel'); if (_rp) _rp.style.display = 'block';
     } catch(e) { showError('Could not load preview: ' + e.message); }
   }
 
